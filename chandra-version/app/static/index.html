@@ -172,22 +172,58 @@
 
     .canvas-viewport {
       flex: 1;
-      overflow: auto;
+      overflow: hidden;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
       background: radial-gradient(circle, #131b2e 10%, #0b0f19 90%);
+      cursor: grab;
+      user-select: none;
     }
+    .canvas-viewport.panning { cursor: grabbing; }
+    .canvas-viewport.mode-select { cursor: default; }
+    .canvas-viewport.mode-draw { cursor: crosshair; }
+
+    .canvas-tools-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #090d16;
+      padding: 2px 4px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+    .tool-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 9px;
+      border-radius: 4px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .tool-btn:hover { color: var(--text); background: #1e293b; }
+    .tool-btn.active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
     .doc-wrapper {
       position: relative;
       box-shadow: 0 12px 36px rgba(0,0,0,0.65);
       border-radius: 4px;
       display: inline-block;
-      transition: transform 0.15s ease;
       transform-origin: center center;
       background: #fff;
+      will-change: transform;
     }
     #docImg {
       display: block;
@@ -195,6 +231,7 @@
       max-height: 72vh;
       border-radius: 4px;
       user-select: none;
+      pointer-events: none;
     }
 
     /* Datalab Bounding Boxes Layer */
@@ -211,8 +248,11 @@
       border-radius: 2px;
       pointer-events: auto;
       cursor: pointer;
-      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: border-color 0.15s, background 0.15s;
+      box-sizing: border-box;
     }
+    .canvas-viewport.mode-select .bbox-rect { cursor: move; }
+
     /* Official Datalab Color System */
     .bbox-rect.FIGURE { border-color: var(--datalab-figure); background: rgba(155, 81, 224, 0.12); }
     .bbox-rect.TEXT { border-color: var(--datalab-text); background: rgba(37, 99, 235, 0.10); }
@@ -225,6 +265,93 @@
       border-width: 2.5px;
       box-shadow: 0 0 12px currentColor;
       z-index: 10;
+    }
+
+    .bbox-rect.selected {
+      border-width: 2px !important;
+      box-shadow: 0 0 0 2px #38bdf8, 0 0 18px rgba(56, 189, 248, 0.55) !important;
+      z-index: 30 !important;
+    }
+
+    /* 8 Resize Handles on Selected Box */
+    .bbox-handle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #ffffff;
+      border: 1.5px solid #0284c7;
+      border-radius: 2px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      z-index: 35;
+      display: none;
+    }
+    .bbox-rect.selected .bbox-handle { display: block; }
+    .bbox-handle.nw { top: -4px; left: -4px; cursor: nwse-resize; }
+    .bbox-handle.n  { top: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+    .bbox-handle.ne { top: -4px; right: -4px; cursor: nesw-resize; }
+    .bbox-handle.e  { top: calc(50% - 4px); right: -4px; cursor: ew-resize; }
+    .bbox-handle.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+    .bbox-handle.s  { bottom: -4px; left: calc(50% - 4px); cursor: ns-resize; }
+    .bbox-handle.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+    .bbox-handle.w  { top: calc(50% - 4px); left: -4px; cursor: ew-resize; }
+
+    /* Floating Bbox Inspector */
+    .bbox-inspector {
+      position: absolute;
+      top: -38px;
+      left: 0;
+      background: #0b1120;
+      border: 1px solid #38bdf8;
+      border-radius: 6px;
+      padding: 3px 8px;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      z-index: 40;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .bbox-rect.selected .bbox-inspector { display: flex; }
+    .bbox-type-select {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #38bdf8;
+      font-weight: 700;
+      font-size: 0.7rem;
+      border-radius: 3px;
+      padding: 2px 4px;
+      outline: none;
+      cursor: pointer;
+    }
+    .bbox-coords-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+    .bbox-del-btn {
+      background: rgba(220, 38, 38, 0.2);
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      color: #f87171;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 0.68rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .bbox-del-btn:hover { background: #dc2626; color: #fff; }
+
+    /* Rubberband Box for Drawing */
+    .rubberband-box {
+      position: absolute;
+      border: 2px dashed #38bdf8;
+      background: rgba(56, 189, 248, 0.15);
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 25;
+      display: none;
     }
 
     /* Non-intrusive Hover Tooltip (Never occludes student handwriting) */
@@ -619,6 +746,15 @@
           <span id="pageCounter">Page 1 / 1</span>
           <button class="page-btn" id="nextPageBtn" disabled>Next</button>
         </div>
+
+        <!-- Canvas Interaction Mode Tools -->
+        <div class="canvas-tools-group">
+          <button class="tool-btn active" id="toolPanBtn" onclick="setCanvasMode('pan')" title="Pan Canvas (Drag to move, Scroll wheel to zoom)">✋ Pan</button>
+          <button class="tool-btn" id="toolSelectBtn" onclick="setCanvasMode('select')" title="Select, Drag & Resize Bounding Boxes">↖ Select / Move</button>
+          <button class="tool-btn" id="toolDrawBtn" onclick="setCanvasMode('draw')" title="Draw Custom Bounding Box">➕ Draw Box</button>
+          <button class="tool-btn" onclick="fitToScreen()" title="Fit to Screen">⛶ Fit</button>
+        </div>
+
         <button class="header-btn" style="padding:3px 8px; font-size:0.72rem;" onclick="startGrading()">⚡ Run AI Evaluation</button>
       </div>
 
@@ -626,6 +762,7 @@
         <div class="doc-wrapper" id="docWrapper">
           <img id="docImg" src="/samples/circuit_diagram_sample2.jpg" alt="Exam Sheet" onload="onImageLoaded()">
           <div class="bbox-overlay show" id="bboxOverlay"></div>
+          <div class="rubberband-box" id="rubberbandBox"></div>
         </div>
 
         <!-- Floating Bboxes Checkbox Pill -->
@@ -738,19 +875,118 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
 
   <script>
     let currentZoom = 100;
+    let canvasPanX = 0;
+    let canvasPanY = 0;
+    let canvasMode = 'pan'; // 'pan' | 'select' | 'draw'
+    let selectedBlockId = null;
     let selectedFiles = [];
     let currentResult = null;
+    let dragAction = null;
+    let drawAction = null;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    function applyCanvasTransform() {
+      const scale = currentZoom / 100;
+      const wrapper = document.getElementById('docWrapper');
+      if (wrapper) {
+        wrapper.style.transform = `translate(${canvasPanX}px, ${canvasPanY}px) scale(${scale})`;
+      }
+      const valEl = document.getElementById('zoomVal');
+      if (valEl) valEl.innerText = Math.round(currentZoom) + '%';
+    }
 
     // Zoom Controls
     function zoom(delta) {
-      currentZoom = Math.min(220, Math.max(50, currentZoom + delta));
-      document.getElementById('zoomVal').innerText = currentZoom + '%';
-      document.getElementById('docWrapper').style.transform = `scale(${currentZoom / 100})`;
+      currentZoom = Math.min(300, Math.max(35, currentZoom + delta));
+      applyCanvasTransform();
     }
     function resetZoom() {
       currentZoom = 100;
-      document.getElementById('zoomVal').innerText = '100%';
-      document.getElementById('docWrapper').style.transform = 'scale(1)';
+      canvasPanX = 0;
+      canvasPanY = 0;
+      applyCanvasTransform();
+    }
+    function fitToScreen() {
+      const vp = document.getElementById('viewport');
+      const img = document.getElementById('docImg');
+      if (!vp || !img) return;
+      const vpW = vp.clientWidth - 48;
+      const vpH = vp.clientHeight - 48;
+      const nw = img.naturalWidth || img.clientWidth || 540;
+      const nh = img.naturalHeight || img.clientHeight || 720;
+      const scaleW = vpW / nw;
+      const scaleH = vpH / nh;
+      currentZoom = Math.max(35, Math.min(200, Math.round(Math.min(scaleW, scaleH) * 100)));
+      canvasPanX = 0;
+      canvasPanY = 0;
+      applyCanvasTransform();
+    }
+
+    function setCanvasMode(mode) {
+      canvasMode = mode;
+      const vp = document.getElementById('viewport');
+      if (vp) {
+        vp.classList.remove('mode-select', 'mode-draw');
+        if (mode === 'select') vp.classList.add('mode-select');
+        else if (mode === 'draw') vp.classList.add('mode-draw');
+      }
+      document.querySelectorAll('.canvas-tools-group .tool-btn').forEach(btn => btn.classList.remove('active'));
+      const btnId = mode === 'pan' ? 'toolPanBtn' : (mode === 'select' ? 'toolSelectBtn' : 'toolDrawBtn');
+      const activeBtn = document.getElementById(btnId);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (mode !== 'select') {
+        deselectAllBlocks();
+      }
+    }
+
+    function deselectAllBlocks() {
+      selectedBlockId = null;
+      document.querySelectorAll('.bbox-rect.selected').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('.block-card.active').forEach(c => c.classList.remove('active'));
+    }
+
+    function selectBlock(blockId, scrollSidebar = true) {
+      deselectAllBlocks();
+      selectedBlockId = blockId;
+      const rect = document.getElementById(`bbox-${blockId}`);
+      if (rect) {
+        rect.classList.add('selected');
+        const overlay = document.getElementById('bboxOverlay');
+        if (overlay) overlay.classList.add('show');
+        const cb = document.getElementById('bboxToggle');
+        if (cb) cb.checked = true;
+      }
+      const card = document.getElementById(`card-${blockId}`);
+      if (card) {
+        card.classList.add('active');
+        if (scrollSidebar) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      if (canvasMode === 'pan') {
+        setCanvasMode('select');
+      }
+    }
+
+    function deleteBlock(blockId, event) {
+      if (event) event.stopPropagation();
+      if (!currentResult || !currentResult.layout_blocks) return;
+      currentResult.layout_blocks = currentResult.layout_blocks.filter(b => b.block_id !== blockId);
+      renderBlocksTab(currentResult);
+      renderBboxes(currentResult.layout_blocks);
+      deselectAllBlocks();
+    }
+
+    function changeBlockType(blockId, newType, event) {
+      if (event) event.stopPropagation();
+      if (!currentResult || !currentResult.layout_blocks) return;
+      const blk = currentResult.layout_blocks.find(b => b.block_id === blockId);
+      if (!blk) return;
+      blk.type = newType;
+      renderBlocksTab(currentResult);
+      renderBboxes(currentResult.layout_blocks);
+      selectBlock(blockId, false);
     }
 
     // Toggle Bboxes
@@ -846,6 +1082,8 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
       docImg.src = '/samples/' + filename;
       selectedFiles = [];
       currentResult = null; // Clear stale result so old bboxes are not redrawn
+      resetZoom();
+      deselectAllBlocks();
 
       // Clear previous bounding boxes immediately so they don't clash with new image
       const overlay = document.getElementById('bboxOverlay');
@@ -876,6 +1114,7 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
     }
 
     function onImageLoaded() {
+      applyCanvasTransform();
       if (currentResult) renderBboxes(currentResult.layout_blocks || []);
     }
 
@@ -1064,6 +1303,7 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
 
         card.onmouseenter = () => highlightBbox(blk.block_id, true);
         card.onmouseleave = () => highlightBbox(blk.block_id, false);
+        card.onclick = () => selectBlock(blk.block_id, true);
         container.appendChild(card);
       });
     }
@@ -1084,6 +1324,7 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
         const [ymin, xmin, ymax, xmax] = blk.bbox;
         const rect = document.createElement('div');
         rect.className = `bbox-rect ${blk.type}`;
+        if (selectedBlockId === blk.block_id) rect.classList.add('selected');
         rect.id = `bbox-${blk.block_id}`;
         rect.style.top = ymin + '%';
         rect.style.left = xmin + '%';
@@ -1096,6 +1337,33 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
         tooltip.innerText = `${blk.type}`;
         rect.appendChild(tooltip);
 
+        // 8 Handles for Resizing
+        const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+        handles.forEach(h => {
+          const handleEl = document.createElement('div');
+          handleEl.className = `bbox-handle ${h}`;
+          handleEl.dataset.handle = h;
+          handleEl.dataset.blockId = blk.block_id;
+          rect.appendChild(handleEl);
+        });
+
+        // Floating Inspector for Selection
+        const inspector = document.createElement('div');
+        inspector.className = 'bbox-inspector';
+        inspector.innerHTML = `
+          <select class="bbox-type-select" onchange="changeBlockType('${blk.block_id}', this.value, event)">
+            <option value="TEXT" ${blk.type === 'TEXT' ? 'selected' : ''}>TEXT</option>
+            <option value="FIGURE" ${blk.type === 'FIGURE' ? 'selected' : ''}>FIGURE</option>
+            <option value="TABLE" ${blk.type === 'TABLE' ? 'selected' : ''}>TABLE</option>
+            <option value="CROSSED_OUT" ${blk.type === 'CROSSED_OUT' ? 'selected' : ''}>CROSSED_OUT</option>
+            <option value="QUESTION" ${blk.type === 'QUESTION' ? 'selected' : ''}>QUESTION</option>
+            <option value="PAGEFOOTER" ${blk.type === 'PAGEFOOTER' ? 'selected' : ''}>PAGEFOOTER</option>
+          </select>
+          <span class="bbox-coords-badge" id="badge-${blk.block_id}">[${ymin.toFixed(0)}%, ${xmin.toFixed(0)}%]</span>
+          <button class="bbox-del-btn" onclick="deleteBlock('${blk.block_id}', event)" title="Delete block">✕</button>
+        `;
+        rect.appendChild(inspector);
+
         rect.onmouseenter = () => {
           rect.classList.add('highlighted');
           const card = document.getElementById(`card-${blk.block_id}`);
@@ -1107,7 +1375,13 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
         rect.onmouseleave = () => {
           rect.classList.remove('highlighted');
           const card = document.getElementById(`card-${blk.block_id}`);
-          if (card) card.classList.remove('active');
+          if (card && selectedBlockId !== blk.block_id) card.classList.remove('active');
+        };
+
+        rect.onclick = (e) => {
+          if (e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.classList.contains('bbox-handle')) return;
+          e.stopPropagation();
+          selectBlock(blk.block_id, true);
         };
 
         overlay.appendChild(rect);
@@ -1118,8 +1392,213 @@ Q3 (5 marks): Final summation check and step marks for normalization.`
       const rect = document.getElementById(`bbox-${blockId}`);
       if (rect) {
         if (isHovered) rect.classList.add('highlighted');
-        else rect.classList.remove('highlighted');
+        else if (selectedBlockId !== blockId) rect.classList.remove('highlighted');
       }
+    }
+
+    function initCanvasInteractions() {
+      const vp = document.getElementById('viewport');
+      const docWrapper = document.getElementById('docWrapper');
+      const docImg = document.getElementById('docImg');
+      const rubberband = document.getElementById('rubberbandBox');
+
+      if (!vp || !docWrapper || !docImg) return;
+
+      vp.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        currentZoom = Math.min(300, Math.max(35, Math.round(currentZoom * factor)));
+        applyCanvasTransform();
+      }, { passive: false });
+
+      vp.addEventListener('mousedown', (e) => {
+        // 1. Check if clicked on a resize handle
+        const handleTarget = e.target.closest('.bbox-handle');
+        if (handleTarget) {
+          e.stopPropagation();
+          e.preventDefault();
+          const blkId = handleTarget.dataset.blockId;
+          const hType = handleTarget.dataset.handle;
+          const blk = currentResult && currentResult.layout_blocks ? currentResult.layout_blocks.find(b => b.block_id === blkId) : null;
+          if (blk) {
+            dragAction = {
+              type: 'resize',
+              blockId: blkId,
+              handle: hType,
+              startX: e.clientX,
+              startY: e.clientY,
+              initBbox: [...blk.bbox]
+            };
+          }
+          return;
+        }
+
+        // 2. Check if clicked inside a bbox-rect
+        const rectTarget = e.target.closest('.bbox-rect');
+        if (rectTarget && e.target.tagName !== 'SELECT' && e.target.tagName !== 'BUTTON') {
+          const blkId = rectTarget.id.replace('bbox-', '');
+          const blk = currentResult && currentResult.layout_blocks ? currentResult.layout_blocks.find(b => b.block_id === blkId) : null;
+          selectBlock(blkId, true);
+          if (blk && (canvasMode === 'select' || canvasMode === 'pan')) {
+            e.stopPropagation();
+            dragAction = {
+              type: 'move',
+              blockId: blkId,
+              startX: e.clientX,
+              startY: e.clientY,
+              initBbox: [...blk.bbox]
+            };
+            return;
+          }
+        }
+
+        // 3. Check drawing mode
+        if (canvasMode === 'draw') {
+          const rect = docImg.getBoundingClientRect();
+          if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            e.preventDefault();
+            const startX = ((e.clientX - rect.left) / rect.width) * 100;
+            const startY = ((e.clientY - rect.top) / rect.height) * 100;
+            drawAction = { startX, startY };
+            if (rubberband) {
+              rubberband.style.display = 'block';
+              rubberband.style.left = startX + '%';
+              rubberband.style.top = startY + '%';
+              rubberband.style.width = '0%';
+              rubberband.style.height = '0%';
+            }
+            return;
+          }
+        }
+
+        // 4. Default or Pan mode: Start panning
+        if (canvasMode === 'pan' || e.button === 1 || e.spaceKey) {
+          isPanning = true;
+          panStartX = e.clientX - canvasPanX;
+          panStartY = e.clientY - canvasPanY;
+          vp.classList.add('panning');
+        } else if (canvasMode === 'select') {
+          deselectAllBlocks();
+        }
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        const imgRect = docImg.getBoundingClientRect();
+
+        // Resizing Bbox Handle
+        if (dragAction && dragAction.type === 'resize') {
+          if (!currentResult || !currentResult.layout_blocks) return;
+          const blk = currentResult.layout_blocks.find(b => b.block_id === dragAction.blockId);
+          if (!blk || !imgRect.width || !imgRect.height) return;
+          const dXPercent = ((e.clientX - dragAction.startX) / imgRect.width) * 100;
+          const dYPercent = ((e.clientY - dragAction.startY) / imgRect.height) * 100;
+          let [y1, x1, y2, x2] = dragAction.initBbox;
+          const h = dragAction.handle;
+
+          if (h.includes('n')) y1 = Math.min(y2 - 2, Math.max(0, y1 + dYPercent));
+          if (h.includes('s')) y2 = Math.max(y1 + 2, Math.min(100, y2 + dYPercent));
+          if (h.includes('w')) x1 = Math.min(x2 - 2, Math.max(0, x1 + dXPercent));
+          if (h.includes('e')) x2 = Math.max(x1 + 2, Math.min(100, x2 + dXPercent));
+
+          blk.bbox = [Math.round(y1*10)/10, Math.round(x1*10)/10, Math.round(y2*10)/10, Math.round(x2*10)/10];
+          const rectEl = document.getElementById(`bbox-${blk.block_id}`);
+          if (rectEl) {
+            rectEl.style.top = blk.bbox[0] + '%';
+            rectEl.style.left = blk.bbox[1] + '%';
+            rectEl.style.width = (blk.bbox[3] - blk.bbox[1]) + '%';
+            rectEl.style.height = (blk.bbox[2] - blk.bbox[0]) + '%';
+          }
+          const badgeEl = document.getElementById(`badge-${blk.block_id}`);
+          if (badgeEl) badgeEl.innerText = `[${blk.bbox[0]}%, ${blk.bbox[1]}%]`;
+          return;
+        }
+
+        // Moving Bbox
+        if (dragAction && dragAction.type === 'move') {
+          if (!currentResult || !currentResult.layout_blocks) return;
+          const blk = currentResult.layout_blocks.find(b => b.block_id === dragAction.blockId);
+          if (!blk || !imgRect.width || !imgRect.height) return;
+          const dXPercent = ((e.clientX - dragAction.startX) / imgRect.width) * 100;
+          const dYPercent = ((e.clientY - dragAction.startY) / imgRect.height) * 100;
+          let [initY1, initX1, initY2, initX2] = dragAction.initBbox;
+          const boxW = initX2 - initX1;
+          const boxH = initY2 - initY1;
+
+          let newX1 = Math.max(0, Math.min(100 - boxW, initX1 + dXPercent));
+          let newY1 = Math.max(0, Math.min(100 - boxH, initY1 + dYPercent));
+          let newX2 = newX1 + boxW;
+          let newY2 = newY1 + boxH;
+
+          blk.bbox = [Math.round(newY1*10)/10, Math.round(newX1*10)/10, Math.round(newY2*10)/10, Math.round(newX2*10)/10];
+          const rectEl = document.getElementById(`bbox-${blk.block_id}`);
+          if (rectEl) {
+            rectEl.style.top = blk.bbox[0] + '%';
+            rectEl.style.left = blk.bbox[1] + '%';
+          }
+          const badgeEl = document.getElementById(`badge-${blk.block_id}`);
+          if (badgeEl) badgeEl.innerText = `[${blk.bbox[0]}%, ${blk.bbox[1]}%]`;
+          return;
+        }
+
+        // Drawing New Bbox
+        if (drawAction && rubberband) {
+          const curX = Math.max(0, Math.min(100, ((e.clientX - imgRect.left) / imgRect.width) * 100));
+          const curY = Math.max(0, Math.min(100, ((e.clientY - imgRect.top) / imgRect.height) * 100));
+          const left = Math.min(drawAction.startX, curX);
+          const top = Math.min(drawAction.startY, curY);
+          const width = Math.abs(curX - drawAction.startX);
+          const height = Math.abs(curY - drawAction.startY);
+          rubberband.style.left = left + '%';
+          rubberband.style.top = top + '%';
+          rubberband.style.width = width + '%';
+          rubberband.style.height = height + '%';
+          return;
+        }
+
+        // Panning Canvas
+        if (isPanning) {
+          canvasPanX = e.clientX - panStartX;
+          canvasPanY = e.clientY - panStartY;
+          applyCanvasTransform();
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (dragAction) {
+          dragAction = null;
+        }
+        if (drawAction) {
+          const imgRect = docImg.getBoundingClientRect();
+          const curX = Math.max(0, Math.min(100, ((e.clientX - imgRect.left) / imgRect.width) * 100));
+          const curY = Math.max(0, Math.min(100, ((e.clientY - imgRect.top) / imgRect.height) * 100));
+          const left = Math.min(drawAction.startX, curX);
+          const top = Math.min(drawAction.startY, curY);
+          const width = Math.abs(curX - drawAction.startX);
+          const height = Math.abs(curY - drawAction.startY);
+
+          if (width > 2 && height > 2) {
+            const newBlk = {
+              block_id: 'manual_' + Date.now().toString().slice(-5),
+              type: 'TEXT',
+              bbox: [Math.round(top*10)/10, Math.round(left*10)/10, Math.round((top+height)*10)/10, Math.round((left+width)*10)/10],
+              text: 'Custom teacher-defined annotation area'
+            };
+            if (!currentResult) currentResult = { layout_blocks: [] };
+            if (!currentResult.layout_blocks) currentResult.layout_blocks = [];
+            currentResult.layout_blocks.push(newBlk);
+            renderBlocksTab(currentResult);
+            renderBboxes(currentResult.layout_blocks);
+            selectBlock(newBlk.block_id, true);
+            setCanvasMode('select');
+          }
+          drawAction = null;
+          if (rubberband) rubberband.style.display = 'none';
+        }
+        if (isPanning) {
+          isPanning = false;
+          vp.classList.remove('panning');
+        }
+      });
     }
 
     let currentSubmissionResult = null;
@@ -1346,6 +1825,7 @@ print("Job submitted:", job_id)
 
     // Auto-initialize on load
     window.addEventListener('DOMContentLoaded', () => {
+      initCanvasInteractions();
       loadBatchQueue();
       startGrading();
     });

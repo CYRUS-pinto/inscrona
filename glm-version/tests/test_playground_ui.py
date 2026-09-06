@@ -129,6 +129,17 @@ class TestPlaygroundInteractivityAndShortcuts:
         assert "crossed_out_sample.jpg" in index_html_content
         assert "rubricElem.value = preset.rubric" in index_html_content
 
+    def test_movable_and_interactable_canvas_tools(self, index_html_content: str):
+        assert "toolPanBtn" in index_html_content
+        assert "toolSelectBtn" in index_html_content
+        assert "toolDrawBtn" in index_html_content
+        assert "initCanvasInteractions" in index_html_content
+        assert "applyCanvasTransform" in index_html_content
+        assert "bbox-handle" in index_html_content
+        assert "bbox-inspector" in index_html_content
+        assert "rubberbandBox" in index_html_content
+        assert "selectBlock" in index_html_content
+
 
 
 class TestPlaygroundBackendIntegration:

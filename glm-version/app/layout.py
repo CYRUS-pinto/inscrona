@@ -88,7 +88,7 @@ def _detect_docling_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         resized = cv2.resize(rgb, (640, 640))
         inp_tensor = np.expand_dims(np.transpose(resized, (2, 0, 1)), axis=0).astype(np.uint8)
-        sizes = np.array([[h, w]], dtype=np.int64)
+        sizes = np.array([[w, h]], dtype=np.int64)
 
         outputs = session.run(None, {"images": inp_tensor, "orig_target_sizes": sizes})
         labels = outputs[0][0]
@@ -133,9 +133,13 @@ def _detect_docling_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
                 continue
             if bw < 5.0 or bh < 1.2:
                 continue
-            # Suppress desk border noise outside standard paper bounds
-            if ymin < 4.0 and bh < 4.5:
+            # Suppress desk background noise above paper (e.g. books/rulers on desk at ymin < 8.0%)
+            if ymin < 8.0 and bw < 70.0:
                 continue
+            # Suppress spiral binder / edge paper margin artifacts
+            if xmin < 8.0 and bw < 12.0:
+                continue
+
 
             detected.append({
                 "type": b_type,
