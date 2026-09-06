@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inscora — Exam Evaluation & Document Layout Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111726;
+      --card-border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Top Navigation Bar */
+    header {
+      height: 56px;
+      border-bottom: 1px solid var(--card-border);
+      background: #0d121f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em; }
+    .brand-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; background: rgba(56,189,248,0.15); color: var(--accent); border: 1px solid rgba(56,189,248,0.3); font-weight: 600; text-transform: uppercase; }
+    .header-controls { display: flex; align-items: center; gap: 14px; }
+    .status-pill { font-size: 0.75rem; display: flex; align-items: center; gap: 6px; color: var(--text-muted); padding: 4px 10px; border-radius: 999px; background: #1e293b; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    /* Main Split-Screen Workspace */
+    .workspace {
+      display: flex;
+      height: calc(100vh - 56px);
+      width: 100vw;
+    }
+
+    /* Left Pane: Interactive Document Canvas */
+    .left-pane {
+      flex: 1.1;
+      border-right: 1px solid var(--card-border);
+      background: #0b0f19;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .canvas-toolbar {
+      height: 48px;
+      background: #111726;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 0.82rem;
+    }
+    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+    .btn-tool {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .btn-tool:hover { background: #334155; }
+    .btn-tool.active { background: var(--accent); color: #090d16; font-weight: 600; border-color: var(--accent); }
+
+    .canvas-area {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background: radial-gradient(#1e293b 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .doc-container {
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .doc-img {
+      display: block;
+      max-width: 100%;
+      max-height: 75vh;
+      object-fit: contain;
+      user-select: none;
+    }
+    .bbox-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      display: none;
+    }
+    .bbox-overlay.show { display: block; }
+    .bbox-rect {
+      position: absolute;
+      border: 2px solid;
+      background: rgba(56,189,248,0.12);
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+    .bbox-rect.PAGEHEADER { border-color: #94a3b8; background: rgba(148,163,184,0.1); }
+    .bbox-rect.SECTIONHEADER { border-color: #38bdf8; background: rgba(56,189,248,0.15); }
+    .bbox-rect.QUESTION { border-color: #22c55e; background: rgba(34,197,94,0.15); }
+    .bbox-rect.STUDENT_ANSWER { border-color: #818cf8; background: rgba(129,140,248,0.1); }
+    .bbox-rect.COMPLEXREGION_DIAGRAM { border-color: #f59e0b; border-style: dashed; background: rgba(245,158,11,0.2); }
+    .bbox-label {
+      position: absolute;
+      top: -18px; left: 0;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: #0f172a;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    /* Samples Tray at bottom of Left Pane */
+    .samples-tray {
+      padding: 10px 16px;
+      border-top: 1px solid var(--card-border);
+      background: #0d121f;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+    }
+    .samples-title { font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+    .sample-pill {
+      font-size: 0.74rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .sample-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Right Pane: Results & Tabbed Inspector */
+    .right-pane {
+      flex: 1.3;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Tabs Header */
+    .tabs-header {
+      display: flex;
+      align-items: center;
+      background: #111726;
+      border-bottom: 1px solid var(--card-border);
+      padding: 0 16px;
+      height: 48px;
+      gap: 4px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+    }
+    .score-summary-pill {
+      margin-left: auto;
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: var(--green);
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      display: none;
+    }
+
+    /* Tab Content Views */
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: none;
+    }
+    .tab-content.active { display: block; }
+
+    /* Evaluation / Grades Tab */
+    .section-card {
+      background: #111726;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .section-title { font-weight: 700; font-size: 0.95rem; color: var(--accent); }
+    .section-badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 999px; background: #1e293b; color: var(--text-muted); }
+
+    .q-card {
+      background: #0d1322;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .q-card.ignored { opacity: 0.6; border-style: dashed; }
+    .q-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .q-id { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+    .q-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+    .badge-counted { background: rgba(34,197,94,0.2); color: var(--green); }
+    .badge-excess { background: rgba(148,163,184,0.2); color: var(--text-muted); }
+    .badge-diagram { background: rgba(245,158,11,0.2); color: var(--amber); }
+
+    .q-score { font-weight: 700; font-size: 1.05rem; }
+    .q-feedback { font-size: 0.83rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 8px; }
+    .override-row { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; margin-top: 8px; }
+    .override-input { width: 55px; padding: 3px 6px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 4px; font-size: 0.8rem; }
+    .btn-override { background: #334155; border: none; color: #fff; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+    .btn-override:hover { background: var(--accent); color: #090d16; }
+
+    .evidence-quote-box {
+      background: rgba(56, 189, 248, 0.08);
+      border-left: 3px solid var(--accent);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      margin: 8px 0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .evidence-title { color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+
+    /* Blocks Tab (Datalab Screenshot #2 Style) */
+    .block-item {
+      background: #111726;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .block-type-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 6px; }
+    .block-text { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #cbd5e1; white-space: pre-wrap; line-height: 1.4; }
+
+    /* Markdown & JSON Tab */
+    pre.code-viewer {
+      background: #0d121f;
+      border: 1px solid var(--card-border);
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+    }
+
+    /* Configuration & Upload Tab */
+    .config-card { background: #111726; border: 1px solid var(--card-border); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+    .config-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; color: var(--text); }
+    .form-group { margin-bottom: 14px; }
+    label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px; }
+    textarea, select, input[type="text"] {
+      width: 100%;
+      background: #0d121f;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+    .preset-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text-muted);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .preset-btn:hover { background: #334155; color: #fff; }
+    .preset-btn.active { background: rgba(56,189,248,0.2); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    textarea { min-height: 120px; font-family: 'Inter', sans-serif; resize: vertical; }
+
+    /* Primary Submit Button */
+    .btn-parse {
+      width: 100%;
+      background: var(--accent);
+      color: #090d16;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 12px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+    .btn-parse:hover { background: var(--accent-hover); }
+
+    /* Real-Time Progress Bar */
+    .progress-bar-container {
+      position: absolute;
+      top: 56px; left: 0; right: 0;
+      height: 4px;
+      background: #1e293b;
+      z-index: 20;
+      display: none;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .progress-status-box {
+      position: absolute;
+      top: 68px; right: 20px;
+      background: #111726;
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 0.82rem;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 20;
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #334155;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header>
+    <div class="brand">
+      Inscora
+      <span class="brand-badge" id="engineBadge">GLM-OCR Edition</span>
+    </div>
+    <div class="header-controls">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span id="ollamaStatus">Connected</span>
+      </div>
+      <button class="btn-tool" onclick="switchTab('config')">⚙️ Configuration</button>
+    </div>
+  </header>
+
+  <!-- Real-Time Progress Bar -->
+  <div class="progress-bar-container" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-status-box" id="progressBox">
+    <div class="spinner"></div>
+    <span id="progressText">Evaluating...</span>
+  </div>
+
+  <!-- Workspace -->
+  <div class="workspace">
+
+    <!-- Left Pane: Document Viewer & Bboxes -->
+    <div class="left-pane">
+      <div class="canvas-toolbar">
+        <div class="toolbar-group">
+          <button class="btn-tool" onclick="prevPage()">◀ Prev</button>
+          <span id="pageCounter">Page 1 / 1</span>
+          <button class="btn-tool" onclick="nextPage()">Next ▶</button>
+        </div>
+        <div class="toolbar-group">
+          <button class="btn-tool active" id="btnBboxes" onclick="toggleBboxes()">Toggle BBoxes</button>
+          <input type="file" id="fileUpload" accept="image/*,.heic,.pdf" multiple style="display:none;" onchange="handleFileSelect(event)">
+          <button class="btn-tool" onclick="document.getElementById('fileUpload').click()">+ Upload File</button>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="canvas-area" id="canvasArea">
+        <div class="doc-container" id="docContainer">
+          <img src="" id="docImg" class="doc-img" alt="Scanned Document">
+          <div class="bbox-overlay show" id="bboxOverlay"></div>
+        </div>
+      </div>
+
+      <!-- Samples Tray -->
+      <div class="samples-tray">
+        <span class="samples-title">Real Test Samples:</span>
+        <div id="samplesList" style="display:flex; gap:8px;">
+          <span class="sample-pill" onclick="loadSample('IMG_1247.jpg')">IMG_1247 (Student Sheet)</span>
+          <span class="sample-pill" onclick="loadSample('IMG_1256.jpg')">IMG_1256</span>
+          <span class="sample-pill" onclick="loadSample('IMG_1264.jpg')">IMG_1264</span>
+          <span class="sample-pill" onclick="loadSample('handwritten_exam_sample1.jpg')">Math Financial Sample</span>
+          <span class="sample-pill" onclick="loadSample('circuit_diagram_sample2.png')">Schematic Diagram</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Pane: Multi-Tab Inspection & Grades -->
+    <div class="right-pane">
+      <div class="tabs-header">
+        <button class="tab-btn active" id="tabBtn-grades" onclick="switchTab('grades')">Evaluation & Grades</button>
+        <button class="tab-btn" id="tabBtn-blocks" onclick="switchTab('blocks')">Blocks</button>
+        <button class="tab-btn" id="tabBtn-markdown" onclick="switchTab('markdown')">Markdown</button>
+        <button class="tab-btn" id="tabBtn-json" onclick="switchTab('json')">JSON</button>
+        <button class="tab-btn" id="tabBtn-config" onclick="switchTab('config')">Configuration</button>
+        <div class="score-summary-pill" id="scorePill">Score: -- / --</div>
+      </div>
+
+      <!-- Tab 1: Evaluation & Grades -->
+      <div class="tab-content active" id="tab-grades">
+        <div id="resultsSummary" style="margin-bottom:16px;"></div>
+        <div id="sectionCardsContainer">
+          <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+            Upload a student exam paper or click a test sample below to evaluate.
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Layout Blocks & OCR Output -->
+      <div class="tab-content" id="tab-blocks">
+        <div id="blocksContainer" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+
+      <!-- Tab 3: Extracted Markdown -->
+      <div class="tab-content" id="tab-markdown">
+        <pre class="code-viewer" id="markdownViewer">No document processed yet.</pre>
+      </div>
+
+      <!-- Tab 4: Raw JSON Response -->
+      <div class="tab-content" id="tab-json">
+        <pre class="code-viewer" id="jsonViewer">No document processed yet.</pre>
+      </div>
+
+      <!-- Tab 5: Configuration -->
+      <div class="tab-content" id="tab-config">
+        <div class="config-card">
+          <div class="config-title">Exam Rubric & Answer Key</div>
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <label style="margin:0;">Answer Key / Grading Criteria</label>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" class="preset-btn active" id="presetBtn-electronics" onclick="applyPreset('electronics')">⚡ Electronics (IMG_1247)</button>
+                <button type="button" class="preset-btn" id="presetBtn-finance" onclick="applyPreset('finance')">📊 Finance (Math)</button>
+                <button type="button" class="preset-btn" id="presetBtn-biology" onclick="applyPreset('biology')">🔬 Biology</button>
+              </div>
+            </div>
+            <textarea id="rubricText">Q1 (5 marks): Non-touch sensors: definition, working principle, sensing without physical contact from a specified distance.
+Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), and load resistor RL.
+Q3 (5 marks): Operation during positive half cycle of AC supply: diode forward/reverse bias and conduction path through load resistor.</textarea>
+          </div>
+          <div class="form-group">
+            <label>University Section Option Rules (e.g. Best 5 of 7)</label>
+            <input type="text" id="sectionRulesInput" value='{"Part A": 5}' placeholder='{"Part A": 5}'>
+            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
+              Automatically scores all questions but only counts the student's highest marks towards the section total.
+            </small>
+          </div>
+          <div class="form-group">
+            <label>Question Paper Structure Mode</label>
+            <select id="rubricModeSelect">
+              <option value="structured">📋 Structured (Question-by-Question: Q1, Q2, Part A...)</option>
+              <option value="unstructured">🌐 Unstructured / Holistic (Concept & Topic Matching - No Q-IDs needed)</option>
+            </select>
+            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
+              Unstructured mode removes rigid question numbering, matching student text & essays against rubric concepts with verbatim citations.
+            </small>
+          </div>
+          <div class="form-group">
+            <label>OCR Mode</label>
+            <select id="ocrModeSelect">
+              <option value="accurate">Accurate (Two-Pass High Accuracy)</option>
+              <option value="fast">Fast (Single-Pass Low Latency)</option>
+            </select>
+          </div>
+          <button class="btn-parse" onclick="startGrading()">🚀 Parse & Grade Document</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentResult = null;
+    let selectedFiles = [];
+    let currentImageIndex = 0;
+    let bboxesVisible = true;
+
+    const RUBRIC_PRESETS = {
+      electronics: {
+        rubric: `Q1 (5 marks): Non-touch sensors: definition, working principle, sensing without physical contact from a specified distance.
+Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), and load resistor RL.
+Q3 (5 marks): Operation during positive half cycle of AC supply: diode forward/reverse bias and conduction path through load resistor.`,
+        rules: '{"Part A": 5}'
+      },
+      finance: {
+        rubric: `Q1 (5 marks): Portfolio weights calculation (Security A weight = 0.30, Security B weight = 0.45, Security C weight = 0.25).
+Q2 (5 marks): Expected rate of return of the portfolio using weighted average formula.
+Q3 (5 marks): Systematic vs unsystematic risk and diversification effect.`,
+        rules: '{"Part A": 3}'
+      },
+      biology: {
+        rubric: `Q1 (5 marks): Definition and chemical equation.
+Q2 (5 marks): Differences between animal and plant cells.
+Q3 (5 marks): Diagram or derivation.`,
+        rules: '{"Part A": 3}'
+      }
+    };
+
+    function applyPreset(key) {
+      const p = RUBRIC_PRESETS[key];
+      if (p) {
+        document.getElementById('rubricText').value = p.rubric;
+        if (p.rules) document.getElementById('sectionRulesInput').value = p.rules;
+        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById('presetBtn-' + key);
+        if (activeBtn) activeBtn.classList.add('active');
+      }
+    }
+
+    // Switch Tabs
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const btn = document.getElementById('tabBtn-' + tabName);
+      const content = document.getElementById('tab-' + tabName);
+      if (btn) btn.classList.add('active');
+      if (content) content.classList.add('active');
+    }
+
+    // Toggle BBoxes overlay
+    function toggleBboxes() {
+      bboxesVisible = !bboxesVisible;
+      const overlay = document.getElementById('bboxOverlay');
+      const btn = document.getElementById('btnBboxes');
+      if (bboxesVisible) {
+        overlay.classList.add('show');
+        btn.classList.add('active');
+      } else {
+        overlay.classList.remove('show');
+        btn.classList.remove('active');
+      }
+    }
+
+    // Load sample image
+    async function loadSample(filename) {
+      const url = '/api/samples/' + filename;
+      document.getElementById('docImg').src = url;
+      document.getElementById('pageCounter').innerText = 'Page 1 / 1';
+      // Fetch image blob to populate selectedFiles
+      const res = await fetch(url);
+      const blob = await res.blob();
+      selectedFiles = [new File([blob], filename, { type: 'image/jpeg' })];
+
+      // Auto-populate the matching answer key
+      if (filename.includes('IMG_1247') || filename.includes('IMG_1256') || filename.includes('IMG_1264')) {
+        applyPreset('electronics');
+      } else if (filename.includes('handwritten_exam_sample1')) {
+        applyPreset('finance');
+      } else if (filename.includes('circuit_diagram')) {
+        applyPreset('electronics');
+      }
+      switchTab('config');
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        selectedFiles = Array.from(e.target.files);
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          document.getElementById('docImg').src = evt.target.result;
+          document.getElementById('pageCounter').innerText = `Page 1 / ${selectedFiles.length}`;
+        };
+        reader.readAsDataURL(selectedFiles[0]);
+        switchTab('config');
+      }
+    }
+
+    // Start Async Grading Job
+    async function startGrading() {
+      if (selectedFiles.length === 0) {
+        alert("Please upload an answer sheet or select a test sample first.");
+        return;
+      }
+
+      const rubric = document.getElementById('rubricText').value;
+      const sectionRules = document.getElementById('sectionRulesInput').value;
+
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('files', f));
+      formData.append('rubric', rubric);
+      if (sectionRules) formData.append('section_rules', sectionRules);
+      const rubricMode = document.getElementById('rubricModeSelect') ? document.getElementById('rubricModeSelect').value : 'structured';
+      formData.append('rubric_mode', rubricMode);
+
+      // UI Progress indicators
+      document.getElementById('progressBar').style.display = 'block';
+      document.getElementById('progressBox').style.display = 'flex';
+      document.getElementById('progressFill').style.width = '10%';
+      document.getElementById('progressText').innerText = "Submitting job...";
+
+      try {
+        const resp = await fetch('/api/grade/async', { method: 'POST', body: formData });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        const jobId = data.job_id;
+
+        // Poll job status every 1.5s
+        pollJob(jobId);
+      } catch (err) {
+        alert("Error starting grading: " + err.message);
+        document.getElementById('progressBar').style.display = 'none';
+        document.getElementById('progressBox').style.display = 'none';
+      }
+    }
+
+    // Poll Background Job
+    async function pollJob(jobId) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/jobs/' + jobId);
+          if (!res.ok) return;
+          const job = await res.json();
+
+          document.getElementById('progressFill').style.width = job.progress + '%';
+          document.getElementById('progressText').innerText = job.stage + ` (${job.progress}%)`;
+
+          if (job.status === 'completed') {
+            clearInterval(interval);
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('progressBox').style.display = 'none';
+            renderResult(job.result);
+          } else if (job.status === 'failed') {
+            clearInterval(interval);
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('progressBox').style.display = 'none';
+            alert("Grading Job Failed: " + (job.error || "Unknown error"));
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 1500);
+    }
+
+    // Render Completed Result
+    function renderResult(res) {
+      currentResult = res;
+
+      // Update Top Score Pill
+      const pill = document.getElementById('scorePill');
+      pill.style.display = 'block';
+      pill.innerText = `Score: ${res.grading.total_awarded} / ${res.grading.total_max}`;
+
+      // 1) Render Evaluation & Grades Tab
+      renderGradesTab(res);
+
+      // 2) Render Blocks Tab & Bboxes on Canvas
+      renderBlocksTab(res);
+
+      // 3) Render Markdown
+      document.getElementById('markdownViewer').innerText = res.ocr.full_text || "";
+
+      // 4) Render JSON
+      document.getElementById('jsonViewer').innerText = JSON.stringify(res, null, 2);
+
+      switchTab('grades');
+    }
+
+    function renderGradesTab(res) {
+      const container = document.getElementById('sectionCardsContainer');
+      container.innerHTML = '';
+
+      // Render mode badge
+      const modeBanner = document.createElement('div');
+      modeBanner.style.cssText = "font-size:0.75rem; color:var(--text-muted); margin-bottom:12px; display:flex; gap:8px; align-items:center;";
+      modeBanner.innerHTML = `Mode: <span class="brand-badge" style="font-size:0.65rem;">${(res.grading.rubric_mode || 'structured').toUpperCase()} EVALUATION</span>`;
+      container.appendChild(modeBanner);
+
+      // Render sections
+      if (res.grading.sections && res.grading.sections.length > 0) {
+        res.grading.sections.forEach(sec => {
+          const secDiv = document.createElement('div');
+          secDiv.className = 'section-card';
+          secDiv.innerHTML = `
+            <div class="section-header">
+              <span class="section-title">${sec.section_id}</span>
+              <span class="section-badge">${sec.rule_applied} (${sec.section_awarded} / ${sec.section_max} marks)</span>
+            </div>
+          `;
+          container.appendChild(secDiv);
+        });
+      }
+
+      // Render question cards
+      res.grading.grades.forEach(q => {
+        const card = document.createElement('div');
+        card.className = 'q-card' + (q.is_counted ? '' : ' ignored');
+
+        const countedBadge = q.is_counted 
+          ? `<span class="q-badge badge-counted">Counted in Total</span>` 
+          : `<span class="q-badge badge-excess">Excess (Not Counted)</span>`;
+
+        const diagramBadge = q.diagram_detected 
+          ? `<span class="q-badge badge-diagram">Diagram / Flowchart Detected</span>` 
+          : '';
+
+        const evidenceBox = q.evidence_quote 
+          ? `<div class="evidence-quote-box"><div class="evidence-title">Verified Student Citation:</div>"${q.evidence_quote}"</div>` 
+          : '';
+
+        card.innerHTML = `
+          <div class="q-card-top">
+            <div class="q-id">
+              ${q.question_id} (${q.section || 'General'})
+              ${countedBadge}
+              ${diagramBadge}
+            </div>
+            <div class="q-score">${q.awarded_marks} / ${q.max_marks}</div>
+          </div>
+          ${evidenceBox}
+          <div class="q-feedback">${q.feedback || 'No comments'}</div>
+          ${q.selection_reason ? `<div style="font-size:0.72rem; color:var(--accent); margin-bottom:6px;">Rule: ${q.selection_reason}</div>` : ''}
+          <div class="override-row">
+            <span>Teacher Override:</span>
+            <input type="number" step="0.5" class="override-input" id="override-${q.question_id}" value="${q.awarded_marks}">
+            <button class="btn-override" onclick="applyTeacherOverride('${q.question_id}')">Update</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderBlocksTab(res) {
+      const blocksContainer = document.getElementById('blocksContainer');
+      const bboxOverlay = document.getElementById('bboxOverlay');
+      blocksContainer.innerHTML = '';
+      bboxOverlay.innerHTML = '';
+
+      if (!res.layout_blocks || res.layout_blocks.length === 0) {
+        blocksContainer.innerHTML = '<div style="padding:20px; color:var(--text-muted);">No layout blocks extracted.</div>';
+        return;
+      }
+
+      res.layout_blocks.forEach(blk => {
+        // Blocks tab item
+        const bDiv = document.createElement('div');
+        bDiv.className = 'block-item';
+        bDiv.innerHTML = `
+          <div class="block-type-tag">${blk.type}</div>
+          <div class="block-text">${blk.text}</div>
+        `;
+        blocksContainer.appendChild(bDiv);
+
+        // Bbox overlay on canvas
+        if (blk.bbox) {
+          const [ymin, xmin, ymax, xmax] = blk.bbox;
+          const rect = document.createElement('div');
+          rect.className = `bbox-rect ${blk.type}`;
+          rect.style.top = ymin + '%';
+          rect.style.left = xmin + '%';
+          rect.style.width = (xmax - xmin) + '%';
+          rect.style.height = (ymax - ymin) + '%';
+
+          const label = document.createElement('div');
+          label.className = 'bbox-label';
+          label.innerText = blk.type;
+          rect.appendChild(label);
+          bboxOverlay.appendChild(rect);
+        }
+      });
+    }
+
+    async function applyTeacherOverride(qid) {
+      if (!currentResult || !currentResult.result_path) return;
+      const filename = currentResult.result_path.split(/[\\/]/).pop();
+      const val = parseFloat(document.getElementById('override-' + qid).value);
+
+      try {
+        const r = await fetch(`/api/results/${filename}/override`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_id: qid, new_marks: val, teacher_note: "Manual verification" })
+        });
+        const updated = await r.json();
+        renderResult(updated);
+        alert(`Marks for ${qid} updated to ${val}`);
+      } catch (err) {
+        alert("Override failed: " + err.message);
+      }
+    }
+
+    function copyJson() {
+      if (!currentResult) return;
+      navigator.clipboard.writeText(JSON.stringify(currentResult, null, 2));
+      alert("JSON copied to clipboard!");
+    }
+
+    function prevPage() {}
+    function nextPage() {}
+
+    // Init: Load first sample on start
+    window.onload = function() {
+      loadSample('IMG_1247.jpg');
+    };
+  </script>
+</body>
+</html>

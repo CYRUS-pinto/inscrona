@@ -1,0 +1,381 @@
+{
+  "info": {
+    "_postman_id": "8f3b49c7-d421-4f1b-b27e-e5a999081e74",
+    "name": "Inscora Enterprise Exam Evaluation API",
+    "description": "Production-grade API collection for Inscora (Chandra & GLM OCR Editions). Supports real-time asynchronous exam paper evaluation, deterministic university section option rules ('Best 5 of 7'), visual layout extraction, and teacher score overrides.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001",
+      "type": "string",
+      "description": "Target server URL. Use http://localhost:8001 for GLM Edition, or http://localhost:8000 for Chandra Edition."
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string",
+      "description": "Automatically populated by the Asynchronous Grading request."
+    },
+    {
+      "key": "sample_filename",
+      "value": "IMG_1247.jpg",
+      "type": "string",
+      "description": "Default sample exam paper filename."
+    }
+  ],
+  "item": [
+    {
+      "name": "1. System & Health",
+      "item": [
+        {
+          "name": "Health Check & Ollama Verification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Verifies API server status, active OCR engine, and Ollama service connectivity."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Test Samples & Documents",
+      "item": [
+        {
+          "name": "List Available Test Samples",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/samples",
+              "host": ["{{base_url}}"],
+              "path": ["api", "samples"]
+            },
+            "description": "Returns all pre-loaded student answer sheets and test samples available on the server."
+          },
+          "response": []
+        },
+        {
+          "name": "Retrieve Sample Image File",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/samples/{{sample_filename}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "samples", "{{sample_filename}}"]
+            },
+            "description": "Downloads or previews a specific sample image."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Asynchronous Evaluation (Recommended / Real-Time)",
+      "item": [
+        {
+          "name": "Submit Grading Job (Async)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.job_id) {",
+                  "    pm.collectionVariables.set('job_id', jsonData.job_id);",
+                  "    console.log('Saved dynamic job_id:', jsonData.job_id);",
+                  "}",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Job ID is returned', function () {",
+                  "    pm.expect(jsonData).to.have.property('job_id');",
+                  "    pm.expect(jsonData.status).to.eql('pending');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "rubric",
+                  "value": "Q1 (5 marks): Non-touch sensors: definition, working principle, sensing without physical contact from a specified distance.\nQ2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), and load resistor RL.\nQ3 (5 marks): Operation during positive half cycle of AC supply: diode forward/reverse bias and conduction path through load resistor.",
+                  "type": "text"
+                },
+                {
+                  "key": "section_rules",
+                  "value": "{\"Part A\": 5}",
+                  "type": "text"
+                },
+                {
+                  "key": "rubric_mode",
+                  "value": "structured",
+                  "type": "text",
+                  "description": "Evaluation mode: 'structured' (Q1, Q2, etc.) or 'unstructured' (holistic concept & essay matching without question numbers)."
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "samples/IMG_1247.jpg",
+                  "description": "Student answer sheet photo or scanned document."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/grade/async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "grade", "async"]
+            },
+            "description": "Submits an exam paper evaluation job to the asynchronous background worker queue. Returns immediately (<50ms) with a job_id."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Grading Job (Async - Unstructured / Holistic Mode)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.job_id) {",
+                  "    pm.collectionVariables.set('job_id', jsonData.job_id);",
+                  "    console.log('Saved dynamic job_id:', jsonData.job_id);",
+                  "}",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Job ID is returned', function () {",
+                  "    pm.expect(jsonData).to.have.property('job_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "rubric",
+                  "value": "Concept 1: Definition of non-touch sensors and operational sensing distance.\nConcept 2: Full-wave bridge rectifier schematic topology (4 diodes D1-D4 and transformer).\nConcept 3: Conduction path and diode states during positive half cycle.",
+                  "type": "text"
+                },
+                {
+                  "key": "rubric_mode",
+                  "value": "unstructured",
+                  "type": "text",
+                  "description": "Unstructured evaluation matches free-form student text against concepts without requiring question numbers."
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "samples/IMG_1247.jpg",
+                  "description": "Student answer sheet photo or scanned document."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/grade/async",
+              "host": ["{{base_url}}"],
+              "path": ["api", "grade", "async"]
+            },
+            "description": "Evaluates unstructured, out-of-order, or essay-based student submissions without rigid question numbering. Extracts verbatim evidence quotes for anti-hallucination."
+          },
+          "response": []
+        },
+        {
+          "name": "Poll Job Status & Progress",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Contains progress percentage', function () {",
+                  "    pm.expect(jsonData).to.have.property('progress');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}"]
+            },
+            "description": "Streams real-time progress (0% -> 30% -> 70% -> 100%) and returns full grading results once completed."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Batch Grading Job (Class Multi-File)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.batch_id) {",
+                  "    pm.collectionVariables.set('batch_id', jsonData.batch_id);",
+                  "}",
+                  "if (jsonData.job_id) {",
+                  "    pm.collectionVariables.set('job_id', jsonData.job_id);",
+                  "}",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Batch ID is returned', function () {",
+                  "    pm.expect(jsonData).to.have.property('batch_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "rubric",
+                  "value": "Q1 (5 marks): Non-touch proximity sensors definition and principle.\nQ2 (5 marks): Bridge rectifier schematic and operation during positive half cycle.\nQ3 (5 marks): Synchronous vs asynchronous counter differences.",
+                  "type": "text"
+                },
+                {
+                  "key": "section_rules",
+                  "value": "{\"Section A\": 2}",
+                  "type": "text"
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "samples/IMG_1247.jpg"
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "samples/IMG_1256.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/grade/batch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "grade", "batch"]
+            },
+            "description": "Submits a batch of multiple student exam papers to be sequentially evaluated in the background, generating an aggregated gradebook CSV."
+          },
+          "response": []
+        },
+        {
+          "name": "Download Class Gradebook CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/csv"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/gradebook/{{batch_id}}.csv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "gradebook", "{{batch_id}}.csv"]
+            },
+            "description": "Downloads the generated Gradebook spreadsheet in CSV format ready for Excel or Google Sheets."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Teacher Audits & Score Overrides",
+      "item": [
+        {
+          "name": "Override Question Mark",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question_id\": \"Q1\",\n  \"awarded_marks\": 5.0,\n  \"reason\": \"Verified non-touch sensor operating distance explanation.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/results/sub_sample_grade.json/override",
+              "host": ["{{base_url}}"],
+              "path": ["api", "results", "sub_sample_grade.json", "override"]
+            },
+            "description": "Enables an authorized human educator to adjust individual marks and recalculate section option totals deterministically."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

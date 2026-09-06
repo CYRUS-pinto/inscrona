@@ -1,0 +1,38 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test & IDE caches
+.pytest_cache/
+*.log
+.mimosa/
+.vscode/
+.idea/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+!.env.example
+
+# Temporary execution artifacts & uploads
+scratch/
+**/results/sub_*.json
+**/results/batch_*
+**/results/*.json
+**/uploads/*.jpg
+**/uploads/*.png
+**/uploads/*.jpeg
+**/uploads/batch_*
+**/smoke_sheet.jpg
+!**/uploads/.gitkeep
+!**/results/.gitkeep
+
+# Operating system metadata
+Thumbs.db
+.DS_Store
