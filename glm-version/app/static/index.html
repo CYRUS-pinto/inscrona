@@ -798,6 +798,13 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
       const docImg = document.getElementById('docImg');
       docImg.src = '/samples/' + filename;
       selectedFiles = [];
+      currentResult = null; // Clear stale result so old bboxes are not redrawn
+
+      // Clear previous bounding boxes immediately so they don't clash with new image
+      const overlay = document.getElementById('bboxOverlay');
+      if (overlay) overlay.innerHTML = '';
+      const blocksCont = document.getElementById('blocksContainer');
+      if (blocksCont) blocksCont.innerHTML = '<div style="color:var(--text-muted); padding:20px; font-size:0.85rem;">⚡ Analyzing genuine document layout & evaluating sheet...</div>';
 
       fetch('/samples/' + filename)
         .then(r => r.blob())
@@ -1018,7 +1025,14 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
       const overlay = document.getElementById('bboxOverlay');
       overlay.innerHTML = '';
 
-      blocks.forEach(blk => {
+      // Sort by area descending so smaller boxes render on top with higher interactive z-index priority
+      const sortedBlocks = [...blocks].sort((a, b) => {
+        const aArea = (a.bbox[2] - a.bbox[0]) * (a.bbox[3] - a.bbox[1]);
+        const bArea = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1]);
+        return bArea - aArea;
+      });
+
+      sortedBlocks.forEach(blk => {
         if (!blk.bbox) return;
         const [ymin, xmin, ymax, xmax] = blk.bbox;
         const rect = document.createElement('div');
@@ -1120,7 +1134,15 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
         const r = await fetch(`/api/results/${filename}`);
         const data = await r.json();
         currentSubmissionResult = data;
-        renderResults(data);
+
+        // Update image if submission has an image URL
+        if (data.image_urls && data.image_urls.length > 0) {
+          document.getElementById('docImg').src = data.image_urls[0];
+        } else if (data.ocr && data.ocr.pages && data.ocr.pages.length > 0 && data.ocr.pages[0].image_url) {
+          document.getElementById('docImg').src = data.ocr.pages[0].image_url;
+        }
+
+        renderResult(data);
         loadBatchQueue();
       } catch (err) {
         console.error("Failed to load queue item:", err);

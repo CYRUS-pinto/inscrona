@@ -144,46 +144,116 @@ def _detect_docling_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
                 "area": bw * bh,
             })
 
-        # Non-maximum suppression: merge heavily overlapping boxes
-        detected.sort(key=lambda d: d["confidence"], reverse=True)
-        filtered = []
-        for d in detected:
-            y1, x1, y2, x2 = d["bbox"]
-            dup = False
-            for f in filtered:
-                fy1, fx1, fy2, fx2 = f["bbox"]
-                iy1, ix1 = max(y1, fy1), max(x1, fx1)
-                iy2, ix2 = min(y2, fy2), min(x2, fx2)
-                if iy2 > iy1 and ix2 > ix1:
-                    inter = (iy2 - iy1) * (ix2 - ix1)
-                    union = d["area"] + f["area"] - inter
-                    iou = inter / union if union > 0 else 0
-                    if iou > 0.55:
-                        dup = True
-                        break
-            if not dup:
-                filtered.append(d)
-
-        filtered.sort(key=lambda d: (d["bbox"][0], d["bbox"][1]))
-        return filtered
+        return _filter_and_declash_boxes(detected)
     except Exception:
         return []
 
 
+def _filter_and_declash_boxes(raw_boxes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Container suppression, containment NMS, and boundary de-clashing.
+    Prevents large enclosing boxes from colliding with granular paragraph/formula boxes.
+    """
+    if not raw_boxes:
+        return []
+
+    # 1. Suppress whole-page frames, tiny specks, and low-confidence edge noise
+    valid = []
+    for b in raw_boxes:
+        ymin, xmin, ymax, xmax = b["bbox"]
+        bw = xmax - xmin
+        bh = ymax - ymin
+        area = bw * bh
+
+        # Drop whole-page outlines/sheet frames
+        if bh > 70.0 and bw > 75.0:
+            continue
+        # Drop tiny specks
+        if bh < 1.2 or bw < 4.0:
+            continue
+        # Drop desk header noise (top 4% with low confidence)
+        if ymin < 4.0 and bh < 5.0 and b.get("confidence", 1.0) < 0.50:
+            continue
+
+        b["area"] = area
+        valid.append(b)
+
+    # 2. Containment-Aware NMS: Drop giant parent containers enclosing smaller detailed boxes
+    valid.sort(key=lambda d: d["area"])  # Smallest, most specific boxes first
+    survivors: List[Dict[str, Any]] = []
+
+    for box in valid:
+        y1, x1, y2, x2 = box["bbox"]
+        area_i = box["area"]
+        is_redundant_container = False
+
+        for survivor in survivors:
+            sy1, sx1, sy2, sx2 = survivor["bbox"]
+            area_s = survivor["area"]
+
+            iy1, ix1 = max(y1, sy1), max(x1, sx1)
+            iy2, ix2 = min(y2, sy2), min(x2, sx2)
+
+            if iy2 > iy1 and ix2 > ix1:
+                inter = (iy2 - iy1) * (ix2 - ix1)
+                containment = inter / area_s
+                # If an already-accepted smaller survivor is inside this larger incoming box,
+                # drop the large container box in favor of the tighter granular box!
+                if containment > 0.60 and area_i > (area_s * 1.6):
+                    is_redundant_container = True
+                    break
+
+                # Standard IoU overlap between similar-sized boxes
+                union = area_i + area_s - inter
+                iou = inter / union if union > 0 else 0
+                if iou > 0.50:
+                    is_redundant_container = True
+                    break
+
+        if not is_redundant_container:
+            survivors.append(box)
+
+    # 3. Sort survivors top-to-bottom
+    survivors.sort(key=lambda d: (d["bbox"][0], d["bbox"][1]))
+
+    # 4. Vertical boundary de-clashing (prevent bounding boxes from visually colliding)
+    for k in range(len(survivors) - 1):
+        curr_b = survivors[k]["bbox"]
+        next_b = survivors[k + 1]["bbox"]
+        if curr_b[2] > next_b[0]:
+            overlap = curr_b[2] - next_b[0]
+            if overlap < 12.0:
+                mid = round((curr_b[2] + next_b[0]) / 2.0, 1)
+                curr_b[2] = mid
+                next_b[0] = mid
+
+    return survivors
+
+
 def _detect_cut_segments(thresh: np.ndarray, sw: int, sh: int) -> List[Tuple[int, int, int, int]]:
-    """Detects pen cut / strikethrough lines using Hough Line Transform."""
+    """Detects genuine pen cut / strikethrough strokes while filtering out notebook ruled lines."""
     if not HAS_CV2 or cv2 is None or np is None:
         return []
-    lines_p = cv2.HoughLinesP(thresh, 1, np.pi / 180, threshold=45, minLineLength=int(sw * 0.05), maxLineGap=14)
+
+    lines_p = cv2.HoughLinesP(thresh, 1, np.pi / 180, threshold=65, minLineLength=int(sw * 0.06), maxLineGap=8)
     cut_segments = []
     if lines_p is not None:
         for line in lines_p:
             l = line.ravel()
             x1, y1, x2, y2 = int(l[0]), int(l[1]), int(l[2]), int(l[3])
+            length = np.hypot(x2 - x1, y2 - y1)
+
+            # Suppress ruled lines that span across the full paper writing width
+            if abs(x2 - x1) > (sw * 0.38):
+                continue
+
             angle = np.abs(np.arctan2(y2 - y1, x2 - x1) * 180.0 / np.pi)
-            # Accept horizontal or diagonal pen strokes crossing words
-            if angle < 35 or angle > 145 or (25 < angle < 65):
+            # A genuine pen cut is either a deliberate diagonal slash (20-75 deg or 105-160 deg)
+            # or a localized horizontal cross-out (length between 6% and 35% of page width)
+            is_diagonal_cut = (20.0 <= angle <= 75.0) or (105.0 <= angle <= 160.0)
+            is_horizontal_strike = (angle < 12.0 or angle > 168.0) and (int(sw * 0.06) <= length <= int(sw * 0.35))
+            if is_diagonal_cut or is_horizontal_strike:
                 cut_segments.append((min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)))
+
     return cut_segments
 
 
@@ -219,7 +289,8 @@ def _detect_cv_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
 
         for c in cnts_fig:
             x, y, bw, bh = cv2.boundingRect(c)
-            if bw > (sw * 0.82) and bh > (sh * 0.82):
+            # Suppress outer page borders / whole-sheet frames
+            if bw > (sw * 0.70) or bh > (sh * 0.65):
                 continue
             area = bw * bh
             aspect = bw / float(bh) if bh > 0 else 0
@@ -250,7 +321,7 @@ def _detect_cv_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
 
         for c in cnts_paras:
             x, y, bw, bh = cv2.boundingRect(c)
-            if bw > (sw * 0.88) and bh > (sh * 0.88):
+            if bw > (sw * 0.70) or bh > (sh * 0.65):
                 continue
             if bw < (sw * 0.12) or bh < (sh * 0.018):
                 continue
@@ -283,8 +354,9 @@ def _detect_cv_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
                 "area": bw * bh,
             })
 
-        detected.sort(key=lambda d: (d["bbox"][0], d["bbox"][1]))
-        return detected
+        return _filter_and_declash_boxes(detected)
+    except Exception:
+        return []
     except Exception:
         return []
 
@@ -356,24 +428,37 @@ def extract_layout_blocks(
                 "confidence": 0.88,
             })
 
-    # 2. Check for cut/strikethrough intersections
-    for reg in visual_blocks:
-        y1, x1, y2, x2 = reg["bbox"]
-        for cx1, cy1, cx2, cy2 in cut_segments:
-            # Check vertical overlap in normalized coordinates
-            c_ymin = (cy1 / 1200.0) * 100.0
-            c_ymax = (cy2 / 1200.0) * 100.0
-            if (y1 - 3.0) <= c_ymin <= (y2 + 3.0) or (y1 - 3.0) <= c_ymax <= (y2 + 3.0):
-                reg["type"] = "CROSSED_OUT"
-                reg["confidence"] = 0.98
-                break
+    # 2. Check for localized cut/strikethrough intersections
+    # CRITICAL: A cut stroke NEVER turns an entire large paragraph (bh > 6%) into CROSSED_OUT.
+    # It only marks a tight single-line region (bh <= 6%) as CROSSED_OUT.
+    if jpegs and len(jpegs) > 0 and cut_segments:
+        for reg in visual_blocks:
+            y1, x1, y2, x2 = reg["bbox"]
+            bh = y2 - y1
+            if bh > 6.0:
+                continue  # Never mark multi-line paragraph as crossed out!
+            for cx1, cy1, cx2, cy2 in cut_segments:
+                c_ymin = (cy1 / float(sh)) * 100.0
+                c_ymax = (cy2 / float(sh)) * 100.0
+                c_xmin = (cx1 / float(sw)) * 100.0
+                c_xmax = (cx2 / float(sw)) * 100.0
+                if (y1 - 1.5) <= c_ymin <= (y2 + 1.5) and (x1 - 4.0) <= c_xmin <= (x2 + 4.0):
+                    reg["type"] = "CROSSED_OUT"
+                    reg["confidence"] = 0.98
+                    break
 
     # 3. Spatially bind genuine OCR text into visual blocks
     text_regions = [r for r in visual_blocks if r["type"] not in ("FIGURE", "PAGEFOOTER")]
     if not text_regions:
         text_regions = visual_blocks
 
-    chunk_size = max(1, len(lines) // max(1, len(text_regions)))
+    total_h = sum(max(1.0, r["bbox"][2] - r["bbox"][0]) for r in text_regions)
+    region_capacities = [max(1, int(round((r["bbox"][2] - r["bbox"][0]) / total_h * len(lines)))) for r in text_regions] if lines else [1] * len(text_regions)
+    if lines and region_capacities:
+        diff = len(lines) - sum(region_capacities)
+        region_capacities[-1] = max(1, region_capacities[-1] + diff)
+
+    line_offset = 0
     layout_blocks: List[LayoutBlock] = []
 
     for idx, reg in enumerate(visual_blocks):
@@ -388,9 +473,9 @@ def extract_layout_blocks(
             block_text = footer_lines[0] if footer_lines else (lines[-1] if lines else "Page Footer")
         else:
             sub_idx = text_regions.index(reg) if reg in text_regions else 0
-            start_l = sub_idx * chunk_size
-            end_l = len(lines) if sub_idx == len(text_regions) - 1 else min(len(lines), (sub_idx + 1) * chunk_size)
-            assigned = lines[start_l:end_l] if start_l < len(lines) else []
+            cap = max(1, region_capacities[sub_idx]) if sub_idx < len(region_capacities) else 1
+            assigned = lines[line_offset : line_offset + cap]
+            line_offset += cap
             block_text = "\n".join(assigned) if assigned else (lines[min(idx, len(lines) - 1)] if lines else "")
 
             # Refine classification based on actual text content

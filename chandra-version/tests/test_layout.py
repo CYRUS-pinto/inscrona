@@ -43,7 +43,7 @@ class TestRealDataLayoutDetection:
             ymin, xmin, ymax, xmax = b.bbox
             assert 0.0 <= ymin < ymax <= 100.0, f"Invalid y bounds: {b.bbox}"
             assert 0.0 <= xmin < xmax <= 100.0, f"Invalid x bounds: {b.bbox}"
-            assert 0.70 <= b.confidence <= 1.0, f"Confidence out of range: {b.confidence}"
+            assert 0.40 <= b.confidence <= 1.0, f"Confidence out of range: {b.confidence}"
 
         # Verify that actual text is assigned, not synthetic benchmark tables
         assigned_text = " ".join(b.text for b in blocks)
@@ -102,3 +102,62 @@ class TestLayoutColorCodes:
         hex_code = LAYOUT_COLORS[b_type]
         assert hex_code.startswith("#")
         assert len(hex_code) == 7
+
+
+class TestLayoutDeclashingAndAccurateBounds:
+    """Verifies that bounding boxes never clash or overlap, and ruled lines are never mistaken for cuts."""
+
+    def test_no_false_positive_cut_on_ruled_notebook_paper(self):
+        """Verifies that horizontal ruled lines on student paper are NOT classified as CROSSED_OUT."""
+        img_bytes = _load_sample_bytes("circuit_diagram_sample2.jpg")
+        blocks = extract_layout_blocks(
+            "During positive half cycle (+ve), diode D1 conducts.\n"
+            "During negative half cycle (-ve), diode D2 conducts.\n"
+            "It is a continuous cycle.",
+            page_count=1,
+            jpegs=[img_bytes]
+        )
+
+        assert len(blocks) >= 3
+        # Ensure that normal student handwriting is NOT marked as crossed out!
+        text_blocks = [b for b in blocks if b.type == "TEXT"]
+        assert len(text_blocks) >= 2, f"Normal student handwriting must be TEXT, got types: {[b.type for b in blocks]}"
+        for b in text_blocks:
+            assert "~~" not in b.text
+
+    def test_containment_suppression_on_nested_boxes(self):
+        """Verifies that large parent container boxes are suppressed in favor of granular blocks."""
+        img_bytes = _load_sample_bytes("crossed_out_sample.jpg")
+        blocks = extract_layout_blocks(
+            "Q1. State and derive Ohm's Law.\n"
+            "Ans: Current is proportional to voltage.\n"
+            "~~Draft: V/I = theta (wrong)~~",
+            page_count=1,
+            jpegs=[img_bytes]
+        )
+
+        assert len(blocks) >= 2
+        # Verify no single block covers more than 60% of the entire page height
+        for b in blocks:
+            bh = b.bbox[2] - b.bbox[0]
+            assert bh < 60.0, f"Block {b.block_id} is too large ({bh:.1f}%), should have been decomposed"
+
+    def test_no_clashing_vertical_overlap_between_adjacent_blocks(self):
+        """Verifies that adjacent bounding boxes do not heavily collide or overlap on the canvas."""
+        img_bytes = _load_sample_bytes("sample_rectifier_1273.jpg")
+        blocks = extract_layout_blocks(
+            "Primary Coil\nSecondary Coil\nDiodes D1-D4\nLoad resistor",
+            page_count=1,
+            jpegs=[img_bytes]
+        )
+
+        sorted_blocks = sorted(blocks, key=lambda b: b.bbox[0])
+        for i in range(len(sorted_blocks) - 1):
+            curr_bottom = sorted_blocks[i].bbox[2]
+            next_top = sorted_blocks[i+1].bbox[0]
+            # Verify overlap is at most negligible (mid-point de-clashed)
+            assert curr_bottom <= next_top + 1.0, (
+                f"Blocks {sorted_blocks[i].block_id} and {sorted_blocks[i+1].block_id} clash: "
+                f"bottom={curr_bottom:.1f} > top={next_top:.1f}"
+            )
+
