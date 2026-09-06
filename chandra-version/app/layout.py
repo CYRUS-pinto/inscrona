@@ -8,11 +8,19 @@ aligned with OCR text and examination grading standards.
 import io
 import re
 from typing import Any, Dict, List, Optional, Tuple
-import cv2
-import numpy as np
-from PIL import Image
 
+try:
+    import cv2
+    import numpy as np
+    HAS_CV2 = True
+except Exception:
+    cv2 = None
+    np = None
+    HAS_CV2 = False
+
+from PIL import Image
 from .schemas import LayoutBlock
+
 
 # Semantic Color Codes matching Datalab
 LAYOUT_COLORS = {
@@ -31,6 +39,8 @@ def _detect_cv_regions(img_bytes: bytes) -> List[Dict[str, Any]]:
     """Analyzes document image using computer vision to detect physical
     bounding boxes of diagrams, tables, text paragraphs, and footers.
     """
+    if not HAS_CV2 or cv2 is None or np is None:
+        return []
     try:
         nparr = np.frombuffer(img_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
