@@ -790,10 +790,57 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
       document.getElementById('renderedMarkdownView').style.display = checked ? 'block' : 'none';
     }
 
+    // Dynamic Sample Presets Catalog (Automatically sets matching rubric and evaluation criteria)
+    const SAMPLE_PRESETS = {
+      'circuit_diagram_sample2.jpg': {
+        name: 'Rectifier Theory (Handwritten Working)',
+        mode: 'structured',
+        rubric: `Q1 (5 marks): Positive half cycle conduction: diode D1 conducts, acts as closed circuit; D2 and D3 reverse biased.
+Q2 (5 marks): Negative half cycle conduction: diode D2 conducts; reverse bias states and continuous wave generation.
+Q3 (5 marks): Continuous cycle wave form generation and current flow characteristics.`
+      },
+      'sample_rectifier_1273.jpg': {
+        name: 'Bridge Rectifier & Waveforms (Diagrams & Table)',
+        mode: 'structured',
+        rubric: `Q1 (5 marks): AC Input and DC Output waveform signals with positive and negative cycle analysis.
+Q2 (5 marks): Bridge rectifier schematic diagram: primary coil, secondary coil, diodes D1-D4, and load resistor.
+Q3 (5 marks): Comparative efficiency table between full-wave and half-wave rectification.`
+      },
+      'sample_student_1247.jpg': {
+        name: 'Student Sheet (Sensors & PN Junction)',
+        mode: 'structured',
+        rubric: `Q1 (5 marks): Working principle and characteristics of non-touch sensors with magnetic fields.
+Q2 (5 marks): P-N junction diode under forward and reverse bias conditions; depletion barrier width.
+Q3 (5 marks): Output signal wave forms and circuit connections.`
+      },
+      'crossed_out_sample.jpg': {
+        name: 'Crossed-Out Derivation (Cut Handling)',
+        mode: 'structured',
+        rubric: `Q1 (5 marks): State Ohm's Law: current is directly proportional to potential difference V applied across conductor.
+Q2 (5 marks): Formula derivation V = I * R, definition of resistance R, and unit in Ohms (Omega).
+Q3 (5 marks): Handling of preliminary calculations: struck-out/crossed-out writing must be ignored without penalty.`
+      },
+      'handwritten_exam_sample1.jpg': {
+        name: 'Math Derivation (Step-Marking)',
+        mode: 'structured',
+        rubric: `Q1 (5 marks): Total weight derivation and fractional step marks: Total = 40000, Weight A = 12000 / 40000 = 0.30.
+Q2 (5 marks): Weight B step calculation: 18000 / 40000 = 0.45.
+Q3 (5 marks): Final summation check and step marks for normalization.`
+      }
+    };
+
     // Load Sample Images
     function loadSample(filename, pillElem) {
       document.querySelectorAll('.sample-pill').forEach(p => p.classList.remove('active'));
       if (pillElem) pillElem.classList.add('active');
+
+      const preset = SAMPLE_PRESETS[filename];
+      if (preset) {
+        const rubricElem = document.getElementById('rubricText');
+        if (rubricElem) rubricElem.value = preset.rubric;
+        const modeElem = document.getElementById('rubricModeSelect');
+        if (modeElem) modeElem.value = preset.mode;
+      }
 
       const docImg = document.getElementById('docImg');
       docImg.src = '/samples/' + filename;

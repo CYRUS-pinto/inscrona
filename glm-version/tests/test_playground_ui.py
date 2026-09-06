@@ -123,6 +123,13 @@ class TestPlaygroundInteractivityAndShortcuts:
         assert "loadBatchQueue" in index_html_content
         assert "SIGNED OFF & VERIFIED" in index_html_content
 
+    def test_sample_presets_and_dynamic_rubrics(self, index_html_content: str):
+        assert "SAMPLE_PRESETS" in index_html_content
+        assert "circuit_diagram_sample2.jpg" in index_html_content
+        assert "crossed_out_sample.jpg" in index_html_content
+        assert "rubricElem.value = preset.rubric" in index_html_content
+
+
 
 class TestPlaygroundBackendIntegration:
     """Validates FastAPI routes serving the playground UI, samples, and verification API."""
