@@ -289,6 +289,35 @@ def list_sample_papers():
     return {"samples": sorted(files)}
 
 
+@app.post("/api/dev/sync")
+def dev_sync():
+    """Hot-syncs the server: pulls latest git commits and reloads in-memory modules instantly."""
+    import subprocess
+    import importlib
+    from . import grader, ocr, preprocess, schemas, jobs
+
+    repo_root = config.BASE_DIR.parent
+    res = subprocess.run(["git", "pull"], cwd=str(repo_root), capture_output=True, text=True)
+
+    reloaded = True
+    try:
+        importlib.reload(schemas)
+        importlib.reload(ocr)
+        importlib.reload(preprocess)
+        importlib.reload(grader)
+        importlib.reload(jobs)
+    except Exception as e:
+        reloaded = str(e)
+
+    return {
+        "status": "ok" if res.returncode == 0 else "error",
+        "git_returncode": res.returncode,
+        "stdout": res.stdout.strip(),
+        "stderr": res.stderr.strip(),
+        "modules_reloaded": reloaded,
+    }
+
+
 @app.get("/api/samples/{filename}")
 def get_sample_image(filename: str):
     safe = Path(filename).name
