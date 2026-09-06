@@ -71,19 +71,24 @@ def laplacian_variance(img: Image.Image) -> float:
 def prepare(raw: bytes) -> PreparedImage:
     img = load_image(raw)
     original_format = getattr(img, "original_format", "UNKNOWN")
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
 
-    # Blur check on a downscaled copy (fast) — pure PIL, no cv2 dependency.
+    # 1. Blur check on a downscaled copy (fast) — pure PIL, no cv2 dependency.
     small = img.copy()
     small.thumbnail((400, 400))
     blur = laplacian_variance(small)
 
-    # Dynamic contrast normalization: sharpens faint pencil & normalizes shadow scans
+    # 2. Grayscale conversion: eliminates chromatic aberration, desk wood tint,
+    # and phone shadow gradients while reducing visual noise.
+    gray = img.convert("L")
+
+    # 3. Dynamic contrast normalization: sharpens faint graphite pencil and ballpoint ink against paper.
     try:
-        img = ImageOps.autocontrast(img, cutoff=0.5)
+        gray = ImageOps.autocontrast(gray, cutoff=0.5)
     except Exception:
         pass
+
+    # 4. Merge back to 3-channel grayscale (R=G=B) so vision models receive standard 3-channel tensors
+    img = Image.merge("RGB", (gray, gray, gray))
 
     resized = False
     if max(img.size) > config.MAX_IMAGE_EDGE:
@@ -91,7 +96,7 @@ def prepare(raw: bytes) -> PreparedImage:
         resized = True
 
     buf = BytesIO()
-    img.convert("RGB").save(buf, format="JPEG", quality=90, optimize=True)
+    img.save(buf, format="JPEG", quality=90, optimize=True)
     return PreparedImage(
         jpeg=buf.getvalue(),
         width=img.size[0],
