@@ -123,12 +123,16 @@ def _process_pipeline(
     if grade_result.overall_confidence < 0.55:
         flags.append(f"low grading confidence ({grade_result.overall_confidence}) — teacher review advised")
 
+    ocr_dict = ocr_result.model_dump() if hasattr(ocr_result, "model_dump") else ocr_result
+    blocks_list = [b.model_dump() if hasattr(b, "model_dump") else b for b in layout_blocks]
+    grading_dict = grade_result.model_dump() if hasattr(grade_result, "model_dump") else grade_result
+
     result = GradeResponse(
         submission_id=submission_id,
         job_id=job_id,
-        ocr=ocr_result,
-        layout_blocks=layout_blocks,
-        grading=grade_result,
+        ocr=ocr_dict,
+        layout_blocks=blocks_list,
+        grading=grading_dict,
         flags=flags,
         image_path=paths[0] if paths else None,
         image_urls=urls,
@@ -286,30 +290,16 @@ def list_sample_papers():
 
 @app.post("/api/dev/sync")
 def dev_sync():
-    """Hot-syncs the server: pulls latest git commits and reloads in-memory modules instantly."""
+    """Hot-syncs the server: pulls latest git commits. Uvicorn --reload automatically reloads."""
     import subprocess
-    import importlib
-    from . import grader, ocr, preprocess, schemas, jobs
-
     repo_root = config.BASE_DIR.parent
     res = subprocess.run(["git", "pull"], cwd=str(repo_root), capture_output=True, text=True)
-
-    reloaded = True
-    try:
-        importlib.reload(schemas)
-        importlib.reload(ocr)
-        importlib.reload(preprocess)
-        importlib.reload(grader)
-        importlib.reload(jobs)
-    except Exception as e:
-        reloaded = str(e)
 
     return {
         "status": "ok" if res.returncode == 0 else "error",
         "git_returncode": res.returncode,
         "stdout": res.stdout.strip(),
         "stderr": res.stderr.strip(),
-        "modules_reloaded": reloaded,
     }
 
 
