@@ -1,7 +1,11 @@
-# Inscora — Dual-Engine Exam Correction
+# Inscora — Dual-Engine Enterprise Exam Correction
 
-Two independent, fully working editions of the same professional exam-correction
-pipeline. Pick one — or run both and compare on your real answer sheets.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/CYRUS-pinto/inscrona/blob/main/Inscora_Colab.ipynb)
+
+> **⚡ 1-Click Cloud Deployment (Free T4 GPU):** Click the badge above to launch the full Vision OCR + LLaMA 3.2 grading suite on Google's cloud with zero local battery or hardware usage.
+
+Two independent, production-grade editions of the university exam-correction
+pipeline. Run locally or in Google Cloud.
 
 | Edition | OCR engine | Port | Folder |
 |---|---|---|---|

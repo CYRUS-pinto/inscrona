@@ -321,12 +321,22 @@ def _parse_grade(
         ev = g.get("evidence_quote")
         ev_str = str(ev).strip() if ev else None
 
+        awarded = max(0.0, float(g.get("awarded_marks", 0)))
+        max_m = max(0.0, float(g.get("max_marks", 0)))
+
+        # Deterministic superficial deduction guard: answers with <80 chars and no diagram cannot exceed 40% of max marks
+        if ev_str and len(ev_str) < 80 and not has_diagram and max_m > 0:
+            capped = min(awarded, round(max_m * 0.4, 1))
+            if capped < awarded:
+                awarded = capped
+                fb = f"[Capped for superficiality]: {fb}"
+
         grades.append(
             QuestionGrade(
                 question_id=q_id,
                 section=sec,
-                awarded_marks=max(0.0, float(g.get("awarded_marks", 0))),
-                max_marks=max(0.0, float(g.get("max_marks", 0))),
+                awarded_marks=awarded,
+                max_marks=max_m,
                 confidence=min(1.0, max(0.0, float(g.get("confidence", 0)))),
                 evidence_quote=ev_str,
                 feedback=fb[:1000],
