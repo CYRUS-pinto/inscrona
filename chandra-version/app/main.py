@@ -46,12 +46,15 @@ app.add_middleware(
 )
 
 if config.SENTRY_DSN:
-    import sentry_sdk
+    try:
+        import sentry_sdk
 
-    sentry_sdk.init(
-        dsn=config.SENTRY_DSN,
-        traces_sample_rate=config.TRACES_SAMPLE_RATE,
-    )
+        sentry_sdk.init(
+            dsn=config.SENTRY_DSN,
+            traces_sample_rate=config.TRACES_SAMPLE_RATE,
+        )
+    except ImportError:
+        pass
 
 
 # In-memory OCR cache: md5(image_bytes) -> OcrResult
