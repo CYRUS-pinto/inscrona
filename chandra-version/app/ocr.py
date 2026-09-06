@@ -70,7 +70,7 @@ def _ollama_page(jpeg: bytes, page_no: int) -> PageOcr:
         ],
         "stream": False,
         "keep_alive": config.OLLAMA_KEEP_ALIVE,
-        "options": {"temperature": 0, "num_predict": 1024},
+        "options": {"temperature": 0.1, "repeat_penalty": 1.25, "repeat_last_n": 64, "num_predict": 1024},
     }
     try:
         body = ollama_chat(payload, timeout=config.OCR_TIMEOUT_S)

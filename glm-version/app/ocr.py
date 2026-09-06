@@ -63,13 +63,28 @@ def _call_ocr(jpeg: bytes, prompt: str) -> str:
         ],
         "stream": False,
         "keep_alive": config.OLLAMA_KEEP_ALIVE,
-        "options": {"temperature": 0, "num_ctx": 4096, "num_predict": 1024},
+        "options": {"temperature": 0.1, "repeat_penalty": 1.25, "repeat_last_n": 64, "num_ctx": 4096, "num_predict": 1024},
     }
     try:
         body = ollama_chat(payload, timeout=config.OCR_TIMEOUT_S)
     except Exception as exc:
         raise OcrError(f"Ollama OCR call failed: {exc}") from exc
-    return body.get("message", {}).get("content", "").strip()
+    raw_text = body.get("message", {}).get("content", "").strip()
+    # Post-process: suppress autoregressive repetition loops
+    lines = raw_text.splitlines()
+    deduped = []
+    prev_line = None
+    rep_count = 0
+    for l in lines:
+        if l == prev_line:
+            rep_count += 1
+            if rep_count > 2:
+                continue
+        else:
+            rep_count = 0
+            prev_line = l
+        deduped.append(l)
+    return "\n".join(deduped).strip()
 
 
 def _ocr_page(jpeg: bytes, page_no: int) -> PageOcr:
