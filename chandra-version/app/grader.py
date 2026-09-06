@@ -318,12 +318,12 @@ def _parse_grade(
         awarded = max(0.0, float(g.get("awarded_marks", 0)))
         max_m = max(0.0, float(g.get("max_marks", 0)))
 
-        # Deterministic superficial deduction guard: answers with <80 chars and no diagram cannot exceed 40% of max marks
-        if ev_str and len(ev_str) < 80 and not has_diagram and max_m > 0:
-            capped = min(awarded, round(max_m * 0.4, 1))
+        # Safeguard against 1-line empty bluff answers: only cap if evidence is genuinely trivial (<25 chars) and lacks diagram
+        if ev_str and len(ev_str.strip()) < 25 and not has_diagram and max_m > 0:
+            capped = min(awarded, round(max_m * 0.3, 1))
             if capped < awarded:
                 awarded = capped
-                fb = f"[Capped for superficiality]: {fb}"
+                fb = f"[Capped for brevity/superficiality]: {fb}"
 
         grades.append(
             QuestionGrade(
@@ -365,8 +365,20 @@ def grade(
     sys_prompt = UNSTRUCTURED_SYSTEM_PROMPT if rubric_mode == "unstructured" else STRUCTURED_SYSTEM_PROMPT
     user_prompt = build_prompt(answer_text, rubric, rubric_mode=rubric_mode)
 
+    target_model = config.GRADE_MODEL
+    try:
+        from .ollama_client import list_models
+        reachable, models = list_models()
+        if reachable and models:
+            if any("qwen2.5:7b" in m for m in models):
+                target_model = "qwen2.5:7b"
+            elif any("llama3.2:3b" in m for m in models):
+                target_model = "llama3.2:3b"
+    except Exception:
+        pass
+
     payload = {
-        "model": config.GRADE_MODEL,
+        "model": target_model,
         "messages": [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},

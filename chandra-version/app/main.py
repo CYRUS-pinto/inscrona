@@ -308,6 +308,19 @@ def dev_sync():
     }
 
 
+@app.post("/api/dev/pull-model")
+def dev_pull_model(model: str = "qwen2.5:7b"):
+    """Pulls an Ollama model directly on the server."""
+    import subprocess
+    res = subprocess.run(["ollama", "pull", model], capture_output=True, text=True)
+    return {
+        "status": "ok" if res.returncode == 0 else "error",
+        "model": model,
+        "stdout": res.stdout.strip(),
+        "stderr": res.stderr.strip(),
+    }
+
+
 @app.get("/api/samples/{filename}")
 def get_sample_image(filename: str):
     safe = Path(filename).name
