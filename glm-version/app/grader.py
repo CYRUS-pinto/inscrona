@@ -51,7 +51,14 @@ BASE_EXAMINER_PERSONA = (
     "   - awarded_marks MUST be between 0.0 and max_marks.\n"
     "   - confidence MUST be a float between 0.0 and 1.0 reflecting confidence given OCR clarity.\n"
     "   - Feedback MUST be constructive, concise, professional, and explain specifically what was credited and what was missing.\n"
-    "   - Output ONLY valid JSON matching the exact schema provided. Never output conversational preamble or prose outside JSON."
+    "   - Output ONLY valid JSON matching the exact schema provided. Never output conversational preamble or prose outside JSON.\n\n"
+    "7. MULTI-PAGE CONTINUITY & UNATTEMPTED QUESTIONS:\n"
+    "   - Exam sheets are segmented by '--- PAGE BREAK ---'. Answers may span across pages; treat text after a page break as a natural continuation.\n"
+    "   - If a page contains '[BLANK PAGE / UNATTEMPTED]' or if the student did not attempt a question, award 0.0 marks with evidence_quote=null and feedback explicitly stating the question was unattempted.\n\n"
+    "8. STEP-MARKING FOR NUMERICAL, DERIVATION & CODE QUESTIONS:\n"
+    "   - Correct formula/method with minor arithmetic slip: award 70-80% credit.\n"
+    "   - Partial derivation or correct algorithm logic with syntax/formatting slip: award 50-60% credit.\n"
+    "   - Do not award 0 marks unless the core concept is completely erroneous or absent."
 )
 
 STRUCTURED_SYSTEM_PROMPT = (
@@ -393,7 +400,7 @@ def grade(
         "stream": False,
         "format": "json",
         "options": {"temperature": 0.1, "num_ctx": 4096, "num_predict": 1024},
-        "keep_alive": 0,  # unload after inference — free VRAM for OCR model
+        "keep_alive": config.OLLAMA_KEEP_ALIVE,
     }
     try:
         with _OLLAMA_LOCK:

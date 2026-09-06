@@ -68,7 +68,7 @@ def _ollama_page(jpeg: bytes, page_no: int) -> PageOcr:
             }
         ],
         "stream": False,
-        "keep_alive": 0,  # unload immediately — sequential-model golden rule
+        "keep_alive": config.OLLAMA_KEEP_ALIVE,
         "options": {"temperature": 0, "num_predict": 1024},
     }
     try:

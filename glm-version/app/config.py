@@ -15,8 +15,9 @@ PASS2_THRESHOLD = float(os.getenv("PASS2_THRESHOLD", "0.55"))
 
 # --- Grading LLM (Ollama) ---
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
-GRADE_MODEL = os.getenv("GRADE_MODEL", "llama3.2:3b")
+GRADE_MODEL = os.getenv("GRADE_MODEL", "qwen2.5:7b")
 GRADE_TIMEOUT_S = int(os.getenv("GRADE_TIMEOUT_S", "300"))
+OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
 # --- Image guard rails (Optimized downscale to 1400px cuts ViT tokens by 65% and saves ~90s) ---
 MAX_IMAGE_EDGE = int(os.getenv("MAX_IMAGE_EDGE", "1400"))
