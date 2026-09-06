@@ -58,7 +58,13 @@ BASE_EXAMINER_PERSONA = (
     "8. STEP-MARKING FOR NUMERICAL, DERIVATION & CODE QUESTIONS:\n"
     "   - Correct formula/method with minor arithmetic slip: award 70-80% credit.\n"
     "   - Partial derivation or correct algorithm logic with syntax/formatting slip: award 50-60% credit.\n"
-    "   - Do not award 0 marks unless the core concept is completely erroneous or absent."
+    "   - Do not award 0 marks unless the core concept is completely erroneous or absent.\n\n"
+    "9. CROSSED-OUT, STRUCK-THROUGH & CANCELLED WRITING:\n"
+    "   - In handwritten exams, students frequently cross out mistakes with pen lines (indicated in OCR transcript as ~~struck out~~ or [CANCELLED]).\n"
+    "   - UNIVERSAL EXAM DIRECTIVE: NEVER evaluate or award marks for crossed-out or cancelled text, formulas, or diagrams, even if conceptually correct.\n"
+    "   - Grade ONLY the student's active, uncanceled response.\n"
+    "   - Never penalize a student for crossing out an erroneous draft if the final uncanceled response is accurate.\n"
+    "   - If a student crosses out an answer and leaves no replacement, treat that question as unattempted (0.0 marks)."
 )
 
 STRUCTURED_SYSTEM_PROMPT = (
@@ -262,7 +268,7 @@ def apply_section_rules(
 
 def extract_layout_blocks(full_text: str, page_count: int = 1) -> List[LayoutBlock]:
     """Segments OCR document text into structured Datalab-style layout blocks
-    (PAGEHEADER, SECTIONHEADER, QUESTION, STUDENT_ANSWER, COMPLEXREGION_DIAGRAM)
+    (FIGURE, TABLE, CROSSED_OUT, QUESTION, PAGEHEADER, TEXT)
     with normalized bounding box estimates [ymin, xmin, ymax, xmax].
     """
     blocks: List[LayoutBlock] = []
@@ -271,23 +277,35 @@ def extract_layout_blocks(full_text: str, page_count: int = 1) -> List[LayoutBlo
         return blocks
 
     block_id_counter = 0
-    current_y = 5.0
-    step_y = min(15.0, 90.0 / max(len(lines), 1))
+    current_y = 6.0
+    step_y = min(16.0, 88.0 / max(len(lines), 1))
 
     for idx, line in enumerate(lines):
         block_id_counter += 1
-        b_type = "STUDENT_ANSWER"
-        bbox = [round(current_y, 1), 8.0, round(min(95.0, current_y + step_y - 2), 1), 92.0]
-        current_y += step_y
+        b_type = "TEXT"
+        h = step_y
 
-        if idx == 0 and any(w in line.lower() for w in ["exam", "university", "college", "test", "paper", "roll"]):
-            b_type = "PAGEHEADER"
-        elif re.match(r"^(part|section)\s+[a-z0-9]", line, re.IGNORECASE):
-            b_type = "SECTIONHEADER"
+        # Layout classification matching Datalab standard
+        if "~~" in line or "[cancelled]" in line.lower() or "[struck" in line.lower():
+            b_type = "CROSSED_OUT"
+            h = min(step_y, 8.0)
+        elif "|" in line or any(t in line.lower() for t in ["table", "column", "half wave", "full wave"]):
+            b_type = "TABLE"
+            h = max(step_y * 1.5, 14.0)
+        elif any(term in line.lower() for term in ["diagram", "circuit", "flowchart", "graph", "schematic", "rectifier", "coil", "diode"]):
+            b_type = "FIGURE"
+            h = max(step_y * 2.0, 20.0)
         elif re.match(r"^(q\s*\d+|question\s*\d+|\d+\.)", line, re.IGNORECASE):
             b_type = "QUESTION"
-        elif any(term in line.lower() for term in ["diagram", "circuit", "flowchart", "graph", "schematic", "\\frac", "\\times"]):
-            b_type = "COMPLEXREGION_DIAGRAM"
+            h = min(step_y, 8.0)
+        elif idx == 0 and any(w in line.lower() for w in ["exam", "university", "college", "test", "paper", "roll"]):
+            b_type = "PAGEHEADER"
+            h = min(step_y, 8.0)
+
+        ymin = round(current_y, 1)
+        ymax = round(min(96.0, current_y + h - 1.5), 1)
+        bbox = [ymin, 8.0, ymax, 92.0]
+        current_y = min(96.0, current_y + h)
 
         blocks.append(
             LayoutBlock(
@@ -295,7 +313,7 @@ def extract_layout_blocks(full_text: str, page_count: int = 1) -> List[LayoutBlo
                 type=b_type,
                 page=1,
                 text=line,
-                confidence=0.85,
+                confidence=0.90 if b_type in ("FIGURE", "TABLE") else 0.85,
                 bbox=bbox,
             )
         )

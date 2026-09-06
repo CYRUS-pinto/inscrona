@@ -24,6 +24,7 @@ from .schemas import OcrResult, PageOcr
 OCR_PROMPT = (
     "Extract ALL text from this exam answer sheet image exactly as written, "
     "including handwriting, question numbers, math (use LaTeX), tables and marks. "
+    "If any word, line, or formula is crossed out or struck through with pen strokes, wrap it with markdown strikethrough: ~~struck-out text~~. "
     "Do not summarize, do not translate, do not add commentary. Output the raw text only."
 )
 

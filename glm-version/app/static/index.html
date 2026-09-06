@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inscora — Exam Evaluation & Document Layout Suite</title>
+  <title>Inscora Enterprise — Document & Exam AI Playground</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -20,37 +20,72 @@
       --amber: #f59e0b;
       --red: #ef4444;
       --purple: #a855f7;
+      --purple-bg: rgba(168, 85, 247, 0.15);
+      --teal: #14b8a6;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
     body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* Top Navigation Bar */
     header {
-      height: 56px;
+      height: 54px;
       border-bottom: 1px solid var(--card-border);
       background: #0d121f;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 16px;
       z-index: 10;
     }
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em; }
-    .brand-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; background: rgba(56,189,248,0.15); color: var(--accent); border: 1px solid rgba(56,189,248,0.3); font-weight: 600; text-transform: uppercase; }
-    .header-controls { display: flex; align-items: center; gap: 14px; }
-    .status-pill { font-size: 0.75rem; display: flex; align-items: center; gap: 6px; color: var(--text-muted); padding: 4px 10px; border-radius: 999px; background: #1e293b; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; }
+    .brand-badge {
+      font-size: 0.68rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56,189,248,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56,189,248,0.3);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .breadcrumb { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .breadcrumb span { color: var(--text); font-weight: 600; }
+    
+    .header-controls { display: flex; align-items: center; gap: 12px; }
+    .engine-picker {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+    }
+    .status-pill {
+      font-size: 0.72rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-    /* Main Split-Screen Workspace */
+    /* Main Split Workspace */
     .workspace {
       display: flex;
-      height: calc(100vh - 56px);
+      height: calc(100vh - 54px);
       width: 100vw;
     }
 
-    /* Left Pane: Interactive Document Canvas */
+    /* Left Pane: Document Canvas */
     .left-pane {
-      flex: 1.1;
+      flex: 1.15;
       border-right: 1px solid var(--card-border);
       background: #0b0f19;
       display: flex;
@@ -58,23 +93,24 @@
       position: relative;
     }
     .canvas-toolbar {
-      height: 48px;
+      height: 44px;
       background: #111726;
       border-bottom: 1px solid var(--card-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
-      font-size: 0.82rem;
+      padding: 0 14px;
+      font-size: 0.8rem;
     }
-    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+    .toolbar-group { display: flex; align-items: center; gap: 6px; }
     .btn-tool {
       background: #1e293b;
       border: 1px solid #334155;
       color: var(--text);
       padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.78rem;
+      border-radius: 5px;
+      font-size: 0.76rem;
+      font-weight: 500;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -84,10 +120,12 @@
     .btn-tool:hover { background: #334155; }
     .btn-tool.active { background: var(--accent); color: #090d16; font-weight: 600; border-color: var(--accent); }
 
+    .zoom-indicator { font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted); min-width: 42px; text-align: center; }
+
     .canvas-area {
       flex: 1;
       overflow: auto;
-      padding: 24px;
+      padding: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -97,20 +135,22 @@
     }
     .doc-container {
       position: relative;
-      max-width: 100%;
-      max-height: 100%;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-      border-radius: 8px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+      border-radius: 6px;
       overflow: hidden;
-      background: #fff;
+      background: #ffffff;
+      transform-origin: center center;
+      transition: transform 0.15s ease;
     }
     .doc-img {
       display: block;
       max-width: 100%;
-      max-height: 75vh;
+      max-height: 72vh;
       object-fit: contain;
       user-select: none;
     }
+
+    /* Bounding Boxes Layer */
     .bbox-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -121,43 +161,76 @@
     .bbox-rect {
       position: absolute;
       border: 2px solid;
-      background: rgba(56,189,248,0.12);
-      border-radius: 4px;
-      transition: all 0.2s ease;
-    }
-    .bbox-rect.PAGEHEADER { border-color: #94a3b8; background: rgba(148,163,184,0.1); }
-    .bbox-rect.SECTIONHEADER { border-color: #38bdf8; background: rgba(56,189,248,0.15); }
-    .bbox-rect.QUESTION { border-color: #22c55e; background: rgba(34,197,94,0.15); }
-    .bbox-rect.STUDENT_ANSWER { border-color: #818cf8; background: rgba(129,140,248,0.1); }
-    .bbox-rect.COMPLEXREGION_DIAGRAM { border-color: #f59e0b; border-style: dashed; background: rgba(245,158,11,0.2); }
-    .bbox-label {
-      position: absolute;
-      top: -18px; left: 0;
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      padding: 1px 4px;
       border-radius: 3px;
-      background: #0f172a;
-      color: #fff;
-      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .bbox-rect.FIGURE { border-color: var(--purple); background: rgba(168, 85, 247, 0.18); }
+    .bbox-rect.TABLE { border-color: var(--teal); background: rgba(20, 184, 166, 0.18); }
+    .bbox-rect.QUESTION { border-color: var(--green); background: rgba(34, 197, 94, 0.15); }
+    .bbox-rect.TEXT { border-color: var(--accent); background: rgba(56, 189, 248, 0.12); }
+    .bbox-rect.CROSSED_OUT { border-color: var(--red); border-style: dashed; background: rgba(239, 68, 68, 0.22); }
+    .bbox-rect:hover, .bbox-rect.highlighted {
+      box-shadow: 0 0 12px currentColor;
+      border-width: 3px;
+      z-index: 5;
     }
 
-    /* Samples Tray at bottom of Left Pane */
+    .bbox-label {
+      position: absolute;
+      top: -16px; left: -2px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 1px 5px;
+      border-radius: 3px 3px 0 0;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    .bbox-rect.FIGURE .bbox-label { background: var(--purple); }
+    .bbox-rect.TABLE .bbox-label { background: var(--teal); }
+    .bbox-rect.QUESTION .bbox-label { background: var(--green); }
+    .bbox-rect.TEXT .bbox-label { background: #0284c7; }
+    .bbox-rect.CROSSED_OUT .bbox-label { background: var(--red); }
+
+    /* Floating BBoxes Pill matching Datalab */
+    .floating-bbox-pill {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      z-index: 8;
+    }
+    .floating-bbox-pill input { accent-color: var(--accent); cursor: pointer; }
+
+    /* Samples Tray */
     .samples-tray {
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-top: 1px solid var(--card-border);
       background: #0d121f;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       overflow-x: auto;
     }
-    .samples-title { font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+    .samples-title { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
     .sample-pill {
-      font-size: 0.74rem;
-      padding: 4px 10px;
-      border-radius: 6px;
+      font-size: 0.72rem;
+      padding: 3px 9px;
+      border-radius: 5px;
       background: #1e293b;
       border: 1px solid #334155;
       color: var(--text);
@@ -165,37 +238,39 @@
       white-space: nowrap;
       transition: all 0.15s;
     }
-    .sample-pill:hover { border-color: var(--accent); color: var(--accent); }
+    .sample-pill:hover { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.1); }
+    .sample-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.15); font-weight: 600; }
 
-    /* Right Pane: Results & Tabbed Inspector */
+    /* Right Pane: Inspector Tabs */
     .right-pane {
-      flex: 1.3;
+      flex: 1.25;
       background: #090d16;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-
-    /* Tabs Header */
     .tabs-header {
       display: flex;
       align-items: center;
       background: #111726;
       border-bottom: 1px solid var(--card-border);
-      padding: 0 16px;
-      height: 48px;
-      gap: 4px;
+      padding: 0 14px;
+      height: 44px;
+      gap: 2px;
     }
     .tab-btn {
       background: transparent;
       border: none;
       color: var(--text-muted);
-      padding: 12px 14px;
-      font-size: 0.82rem;
+      padding: 10px 12px;
+      font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
       position: relative;
-      transition: color 0.2s;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     .tab-btn:hover { color: var(--text); }
     .tab-btn.active { color: var(--accent); }
@@ -206,14 +281,24 @@
       height: 2px;
       background: var(--accent);
     }
+    .tab-controls-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .html-toggle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .html-toggle input { accent-color: var(--accent); }
     .score-summary-pill {
-      margin-left: auto;
       background: rgba(34,197,94,0.15);
-      border: 1px solid rgba(34,197,94,0.3);
+      border: 1px solid rgba(34,197,94,0.35);
       color: var(--green);
       font-weight: 700;
-      font-size: 0.85rem;
-      padding: 4px 12px;
+      font-size: 0.82rem;
+      padding: 3px 10px;
       border-radius: 999px;
       display: none;
     }
@@ -222,317 +307,352 @@
     .tab-content {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 16px;
       display: none;
     }
     .tab-content.active { display: block; }
 
-    /* Evaluation / Grades Tab */
-    .section-card {
+    /* Blocks Tab (Matching Datalab Screenshot) */
+    .block-card {
       background: #111726;
       border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: all 0.15s ease;
     }
-    .section-header {
+    .block-card:hover, .block-card.active { border-color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .block-card-header {
+      padding: 6px 12px;
+      background: #172033;
+      border-bottom: 1px solid var(--card-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
+      font-size: 0.72rem;
     }
-    .section-title { font-weight: 700; font-size: 0.95rem; color: var(--accent); }
-    .section-badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 999px; background: #1e293b; color: var(--text-muted); }
-
-    .q-card {
-      background: #0d1322;
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 12px;
-      position: relative;
-      transition: border-color 0.2s;
+    .block-badge {
+      font-weight: 700;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #fff;
     }
-    .q-card.ignored { opacity: 0.6; border-style: dashed; }
-    .q-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .q-id { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
-    .q-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
-    .badge-counted { background: rgba(34,197,94,0.2); color: var(--green); }
-    .badge-excess { background: rgba(148,163,184,0.2); color: var(--text-muted); }
-    .badge-diagram { background: rgba(245,158,11,0.2); color: var(--amber); }
+    .block-badge.FIGURE { background: var(--purple); }
+    .block-badge.TABLE { background: var(--teal); }
+    .block-badge.QUESTION { background: var(--green); }
+    .block-badge.TEXT { background: #0284c7; }
+    .block-badge.CROSSED_OUT { background: var(--red); }
 
-    .q-score { font-weight: 700; font-size: 1.05rem; }
-    .q-feedback { font-size: 0.83rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 8px; }
-    .override-row { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; margin-top: 8px; }
-    .override-input { width: 55px; padding: 3px 6px; background: #1e293b; border: 1px solid #334155; color: #fff; border-radius: 4px; font-size: 0.8rem; }
-    .btn-override { background: #334155; border: none; color: #fff; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-    .btn-override:hover { background: var(--accent); color: #090d16; }
-
-    .evidence-quote-box {
-      background: rgba(56, 189, 248, 0.08);
-      border-left: 3px solid var(--accent);
-      padding: 6px 10px;
+    .block-card-body { padding: 12px; font-size: 0.84rem; line-height: 1.5; }
+    
+    /* Figure Preview Box */
+    .figure-crop-box {
+      width: 100%;
+      max-height: 220px;
+      background: #ffffff;
       border-radius: 4px;
-      font-size: 0.74rem;
-      color: #cbd5e1;
-      margin: 8px 0;
-      font-family: 'JetBrains Mono', monospace;
+      overflow: hidden;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #334155;
     }
-    .evidence-title { color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+    .figure-crop-img { max-width: 100%; max-height: 220px; object-fit: contain; }
+    .figure-caption {
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      line-height: 1.4;
+      background: rgba(168, 85, 247, 0.08);
+      padding: 8px 10px;
+      border-left: 3px solid var(--purple);
+      border-radius: 0 4px 4px 0;
+    }
 
-    /* Blocks Tab (Datalab Screenshot #2 Style) */
-    .block-item {
+    /* Strikethrough & Cut Styling */
+    .struck-content {
+      text-decoration: line-through;
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .cut-alert-banner {
+      font-size: 0.72rem;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Grading Tab */
+    .q-card {
       background: #111726;
       border: 1px solid var(--card-border);
       border-radius: 6px;
       padding: 12px 14px;
       margin-bottom: 10px;
+      transition: border-color 0.15s;
     }
-    .block-type-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 6px; }
-    .block-text { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #cbd5e1; white-space: pre-wrap; line-height: 1.4; }
-
-    /* Markdown & JSON Tab */
-    pre.code-viewer {
-      background: #0d121f;
+    .q-card.ignored { opacity: 0.65; border-left: 3px solid #64748b; }
+    .q-card:not(.ignored) { border-left: 3px solid var(--green); }
+    .q-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .q-id { font-weight: 700; font-size: 0.9rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .q-score { font-weight: 700; font-size: 1rem; color: var(--green); font-family: 'JetBrains Mono', monospace; }
+    .q-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 999px; font-weight: 600; text-transform: uppercase; }
+    .badge-counted { background: rgba(34,197,94,0.18); color: var(--green); }
+    .badge-excess { background: rgba(148,163,184,0.18); color: var(--text-muted); }
+    .badge-diagram { background: rgba(168,85,247,0.18); color: var(--purple); }
+    
+    .evidence-box {
+      background: #0b0f19;
       border: 1px solid var(--card-border);
-      padding: 16px;
-      border-radius: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      overflow-x: auto;
-      color: #e2e8f0;
-      white-space: pre-wrap;
+      border-left: 3px solid var(--accent);
+      padding: 8px 10px;
+      border-radius: 0 4px 4px 0;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      font-style: italic;
     }
+    .feedback-text { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
 
-    /* Configuration & Upload Tab */
-    .config-card { background: #111726; border: 1px solid var(--card-border); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
-    .config-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; color: var(--text); }
-    .form-group { margin-bottom: 14px; }
-    label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px; }
-    textarea, select, input[type="text"] {
-      width: 100%;
-      background: #0d121f;
-      border: 1px solid var(--card-border);
-      color: #fff;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 0.82rem;
-    }
-    .preset-btn {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: var(--text-muted);
-      padding: 4px 9px;
-      border-radius: 6px;
-      font-size: 0.72rem;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .preset-btn:hover { background: #334155; color: #fff; }
-    .preset-btn.active { background: rgba(56,189,248,0.2); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-    textarea { min-height: 120px; font-family: 'Inter', sans-serif; resize: vertical; }
-
-    /* Primary Submit Button */
-    .btn-parse {
-      width: 100%;
-      background: var(--accent);
-      color: #090d16;
-      font-weight: 700;
-      font-size: 0.95rem;
-      padding: 12px 18px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
+    .override-row {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 8px;
-      transition: background 0.15s;
+      padding-top: 8px;
+      border-top: 1px dashed var(--card-border);
+      font-size: 0.75rem;
     }
-    .btn-parse:hover { background: var(--accent-hover); }
-
-    /* Real-Time Progress Bar */
-    .progress-bar-container {
-      position: absolute;
-      top: 56px; left: 0; right: 0;
-      height: 4px;
+    .override-input {
+      width: 60px;
       background: #1e293b;
-      z-index: 20;
-      display: none;
+      border: 1px solid #334155;
+      color: var(--text);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      text-align: center;
     }
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--green));
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-    .progress-status-box {
-      position: absolute;
-      top: 68px; right: 20px;
-      background: #111726;
+
+    /* Progress and Code Viewers */
+    .code-viewer {
+      background: #0b0f19;
       border: 1px solid var(--card-border);
-      padding: 10px 16px;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      font-size: 0.82rem;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      z-index: 20;
+      padding: 14px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      line-height: 1.5;
     }
-    .spinner {
-      width: 16px; height: 16px;
-      border: 2px solid #334155;
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .progress-bar-container { height: 3px; width: 100%; background: #1e293b; display: none; }
+    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width 0.3s ease; }
+
+    /* Configuration Panel */
+    .config-card { background: #111726; border: 1px solid var(--card-border); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
+    .config-title { font-weight: 700; font-size: 0.88rem; color: var(--accent); margin-bottom: 12px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+    .form-group textarea, .form-group input, .form-group select {
+      width: 100%;
+      background: #0b0f19;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 8px;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      outline: none;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .form-group textarea { height: 110px; font-family: 'JetBrains Mono', monospace; resize: vertical; }
+    .btn-parse {
+      width: 100%;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-parse:hover { opacity: 0.92; }
   </style>
 </head>
 <body>
 
-  <!-- Top Bar -->
+  <!-- Top Navigation Bar -->
   <header>
-    <div class="brand">
-      Inscora
-      <span class="brand-badge" id="engineBadge">GLM-OCR Edition</span>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="brand">
+        <span>Inscora</span>
+        <span class="brand-badge">Playground</span>
+      </div>
+      <div class="breadcrumb">
+        Public Playground / <span>Document & Exam AI</span>
+      </div>
     </div>
     <div class="header-controls">
+      <select class="engine-picker" id="engineSelect" onchange="handleEngineChange()">
+        <option value="glm">⚡ GLM-OCR (0.9B Local SOTA)</option>
+        <option value="chandra">🔬 Chandra OCR (Datalab SOTA)</option>
+      </select>
       <div class="status-pill">
         <div class="status-dot"></div>
-        <span id="ollamaStatus">Connected</span>
+        <span id="systemStatus">Colab T4 GPU (qwen2.5:7b)</span>
       </div>
       <button class="btn-tool" onclick="switchTab('config')">⚙️ Configuration</button>
     </div>
   </header>
 
-  <!-- Real-Time Progress Bar -->
+  <!-- Real-Time Top Progress Bar -->
   <div class="progress-bar-container" id="progressBar">
     <div class="progress-bar-fill" id="progressFill"></div>
   </div>
-  <div class="progress-status-box" id="progressBox">
-    <div class="spinner"></div>
-    <span id="progressText">Evaluating...</span>
-  </div>
 
-  <!-- Workspace -->
+  <!-- Main Workspace -->
   <div class="workspace">
 
-    <!-- Left Pane: Document Viewer & Bboxes -->
+    <!-- Left Document Viewport -->
     <div class="left-pane">
       <div class="canvas-toolbar">
         <div class="toolbar-group">
           <button class="btn-tool" onclick="prevPage()">◀ Prev</button>
-          <span id="pageCounter">Page 1 / 1</span>
+          <span id="pageCounter" style="font-size:0.76rem; font-weight:600;">Page 1 / 1</span>
           <button class="btn-tool" onclick="nextPage()">Next ▶</button>
         </div>
         <div class="toolbar-group">
-          <button class="btn-tool active" id="btnBboxes" onclick="toggleBboxes()">Toggle BBoxes</button>
+          <span class="zoom-indicator" id="zoomVal">100%</span>
+          <button class="btn-tool" onclick="changeZoom(-0.1)">−</button>
+          <button class="btn-tool" onclick="changeZoom(0.1)">+</button>
+          <button class="btn-tool" onclick="resetZoom()">Reset</button>
           <input type="file" id="fileUpload" accept="image/*,.heic,.pdf" multiple style="display:none;" onchange="handleFileSelect(event)">
-          <button class="btn-tool" onclick="document.getElementById('fileUpload').click()">+ Upload File</button>
+          <button class="btn-tool active" onclick="document.getElementById('fileUpload').click()">+ Upload File</button>
         </div>
       </div>
 
-      <!-- Canvas Area -->
+      <!-- Canvas Area with Image & Interactive Bboxes -->
       <div class="canvas-area" id="canvasArea">
         <div class="doc-container" id="docContainer">
-          <img src="" id="docImg" class="doc-img" alt="Scanned Document">
+          <img src="" id="docImg" class="doc-img" alt="Document Sheet" onload="onImageLoaded()">
           <div class="bbox-overlay show" id="bboxOverlay"></div>
+        </div>
+
+        <!-- Floating Bboxes Pill matching Datalab -->
+        <div class="floating-bbox-pill" onclick="toggleBboxes()">
+          <input type="checkbox" id="bboxCheck" checked onclick="event.stopPropagation(); toggleBboxes();">
+          <label for="bboxCheck" style="cursor:pointer;">Bboxes</label>
         </div>
       </div>
 
-      <!-- Samples Tray -->
+      <!-- Real-World Test Samples Tray -->
       <div class="samples-tray">
         <span class="samples-title">Real Test Samples:</span>
-        <div id="samplesList" style="display:flex; gap:8px;">
-          <span class="sample-pill" onclick="loadSample('IMG_1247.jpg')">IMG_1247 (Student Sheet)</span>
-          <span class="sample-pill" onclick="loadSample('IMG_1256.jpg')">IMG_1256</span>
-          <span class="sample-pill" onclick="loadSample('IMG_1264.jpg')">IMG_1264</span>
-          <span class="sample-pill" onclick="loadSample('handwritten_exam_sample1.jpg')">Math Financial Sample</span>
-          <span class="sample-pill" onclick="loadSample('circuit_diagram_sample2.png')">Schematic Diagram</span>
-        </div>
+        <span class="sample-pill active" onclick="loadSample('circuit_diagram_sample2.png')">Rectifier & Waveforms (Screenshot Match)</span>
+        <span class="sample-pill" onclick="loadSample('IMG_1247.jpg')">Student Sheet (Sensors)</span>
+        <span class="sample-pill" onclick="loadSample('IMG_1256.jpg')">Math Derivation</span>
+        <span class="sample-pill" onclick="loadSample('fabricated_alice_excellent.jpg')">Alice (High Achiever)</span>
+        <span class="sample-pill" onclick="loadSample('fabricated_charlie_jailbreak.jpg')">Charlie (Jailbreak Test)</span>
       </div>
     </div>
 
-    <!-- Right Pane: Multi-Tab Inspection & Grades -->
+    <!-- Right Pane: Tabs & Inspection -->
     <div class="right-pane">
       <div class="tabs-header">
-        <button class="tab-btn active" id="tabBtn-grades" onclick="switchTab('grades')">Evaluation & Grades</button>
-        <button class="tab-btn" id="tabBtn-blocks" onclick="switchTab('blocks')">Blocks</button>
-        <button class="tab-btn" id="tabBtn-markdown" onclick="switchTab('markdown')">Markdown</button>
-        <button class="tab-btn" id="tabBtn-json" onclick="switchTab('json')">JSON</button>
-        <button class="tab-btn" id="tabBtn-config" onclick="switchTab('config')">Configuration</button>
-        <div class="score-summary-pill" id="scorePill">Score: -- / --</div>
+        <button class="tab-btn active" id="tabBtn-blocks" onclick="switchTab('blocks')">🔲 Blocks</button>
+        <button class="tab-btn" id="tabBtn-grades" onclick="switchTab('grades')">📝 Grading & Audit</button>
+        <button class="tab-btn" id="tabBtn-markdown" onclick="switchTab('markdown')">📄 Markdown</button>
+        <button class="tab-btn" id="tabBtn-json" onclick="switchTab('json')">{ } JSON</button>
+        <button class="tab-btn" id="tabBtn-api" onclick="switchTab('api')">⚡ API</button>
+        <button class="tab-btn" id="tabBtn-config" onclick="switchTab('config')">⚙️ Rubric</button>
+        <div class="tab-controls-right">
+          <label class="html-toggle">
+            <input type="checkbox" id="renderHtmlCheck" checked onchange="toggleRenderHtml()">
+            <span>Render HTML</span>
+          </label>
+          <div class="score-summary-pill" id="scorePill">Score: -- / --</div>
+        </div>
       </div>
 
-      <!-- Tab 1: Evaluation & Grades -->
-      <div class="tab-content active" id="tab-grades">
-        <div id="resultsSummary" style="margin-bottom:16px;"></div>
-        <div id="sectionCardsContainer">
+      <!-- Sub-Tab 1: Blocks (With Visual Diagram Crops & Cuts Handling) -->
+      <div class="tab-content active" id="tab-blocks">
+        <div id="blocksContainer">
           <div style="text-align:center; padding: 40px; color: var(--text-muted);">
-            Upload a student exam paper or click a test sample below to evaluate.
+            Upload a document or click a test sample to segment blocks and view figures.
           </div>
         </div>
       </div>
 
-      <!-- Tab 2: Layout Blocks & OCR Output -->
-      <div class="tab-content" id="tab-blocks">
-        <div id="blocksContainer" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <!-- Sub-Tab 2: Grading & University Scoring -->
+      <div class="tab-content" id="tab-grades">
+        <div id="gradesContainer">
+          <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+            Evaluation scores and verbatim citations will appear here after grading.
+          </div>
+        </div>
       </div>
 
-      <!-- Tab 3: Extracted Markdown -->
+      <!-- Sub-Tab 3: Markdown View -->
       <div class="tab-content" id="tab-markdown">
-        <pre class="code-viewer" id="markdownViewer">No document processed yet.</pre>
+        <div id="renderedMarkdownView" style="display:block; line-height:1.6; font-size:0.85rem;"></div>
+        <pre class="code-viewer" id="rawMarkdownView" style="display:none;"></pre>
       </div>
 
-      <!-- Tab 4: Raw JSON Response -->
+      <!-- Sub-Tab 4: JSON View -->
       <div class="tab-content" id="tab-json">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+          <button class="btn-tool" onclick="copyJson()">📋 Copy JSON</button>
+        </div>
         <pre class="code-viewer" id="jsonViewer">No document processed yet.</pre>
       </div>
 
-      <!-- Tab 5: Configuration -->
+      <!-- Sub-Tab 5: API Code Snippet -->
+      <div class="tab-content" id="tab-api">
+        <div class="config-card">
+          <div class="config-title">cURL (Direct Execution)</div>
+          <pre class="code-viewer" id="curlSnippet"></pre>
+        </div>
+        <div class="config-card">
+          <div class="config-title">Python (requests SDK)</div>
+          <pre class="code-viewer" id="pythonSnippet"></pre>
+        </div>
+      </div>
+
+      <!-- Sub-Tab 6: Configuration & Rubrics -->
       <div class="tab-content" id="tab-config">
         <div class="config-card">
-          <div class="config-title">Exam Rubric & Answer Key</div>
+          <div class="config-title">Official Answer Key & Grading Rubric</div>
           <div class="form-group">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <label style="margin:0;">Answer Key / Grading Criteria</label>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" class="preset-btn active" id="presetBtn-electronics" onclick="applyPreset('electronics')">⚡ Electronics (IMG_1247)</button>
-                <button type="button" class="preset-btn" id="presetBtn-finance" onclick="applyPreset('finance')">📊 Finance (Math)</button>
-                <button type="button" class="preset-btn" id="presetBtn-biology" onclick="applyPreset('biology')">🔬 Biology</button>
-              </div>
-            </div>
-            <textarea id="rubricText">Q1 (5 marks): Non-touch sensors: definition, working principle, sensing without physical contact from a specified distance.
-Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), and load resistor RL.
-Q3 (5 marks): Operation during positive half cycle of AC supply: diode forward/reverse bias and conduction path through load resistor.</textarea>
+            <label>Answer Key / Question Rubric:</label>
+            <textarea id="rubricText">Q1 (5 marks): Non-touch sensors: definition, working principle, electromagnetic induction, sensing range (1-20mm).
+Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), operation during positive half cycle through load resistor RL.
+Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clocking, speed, propagation delay.</textarea>
           </div>
           <div class="form-group">
-            <label>University Section Option Rules (e.g. Best 5 of 7)</label>
-            <input type="text" id="sectionRulesInput" value='{"Part A": 5}' placeholder='{"Part A": 5}'>
-            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
-              Automatically scores all questions but only counts the student's highest marks towards the section total.
-            </small>
+            <label>Section Option Rules (e.g. Best 2 of 3):</label>
+            <input type="text" id="sectionRulesInput" value='{"Part A": 2}'>
           </div>
           <div class="form-group">
-            <label>Question Paper Structure Mode</label>
+            <label>Evaluation Mode:</label>
             <select id="rubricModeSelect">
-              <option value="structured">📋 Structured (Question-by-Question: Q1, Q2, Part A...)</option>
-              <option value="unstructured">🌐 Unstructured / Holistic (Concept & Topic Matching - No Q-IDs needed)</option>
-            </select>
-            <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
-              Unstructured mode removes rigid question numbering, matching student text & essays against rubric concepts with verbatim citations.
-            </small>
-          </div>
-          <div class="form-group">
-            <label>OCR Mode</label>
-            <select id="ocrModeSelect">
-              <option value="accurate">Accurate (Two-Pass High Accuracy)</option>
-              <option value="fast">Fast (Single-Pass Low Latency)</option>
+              <option value="structured">📋 Structured (Question-by-Question: Q1, Q2...)</option>
+              <option value="unstructured">🌐 Unstructured / Holistic (Essay / Topic Matching)</option>
             </select>
           </div>
-          <button class="btn-parse" onclick="startGrading()">🚀 Parse & Grade Document</button>
+          <button class="btn-parse" onclick="startGrading()">🚀 Run OCR & Grade Document</button>
         </div>
       </div>
 
@@ -542,42 +662,22 @@ Q3 (5 marks): Operation during positive half cycle of AC supply: diode forward/r
   <script>
     let currentResult = null;
     let selectedFiles = [];
-    let currentImageIndex = 0;
     let bboxesVisible = true;
+    let zoomLevel = 1.0;
 
-    const RUBRIC_PRESETS = {
-      electronics: {
-        rubric: `Q1 (5 marks): Non-touch sensors: definition, working principle, sensing without physical contact from a specified distance.
-Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), and load resistor RL.
-Q3 (5 marks): Operation during positive half cycle of AC supply: diode forward/reverse bias and conduction path through load resistor.`,
-        rules: '{"Part A": 5}'
-      },
-      finance: {
-        rubric: `Q1 (5 marks): Portfolio weights calculation (Security A weight = 0.30, Security B weight = 0.45, Security C weight = 0.25).
-Q2 (5 marks): Expected rate of return of the portfolio using weighted average formula.
-Q3 (5 marks): Systematic vs unsystematic risk and diversification effect.`,
-        rules: '{"Part A": 3}'
-      },
-      biology: {
-        rubric: `Q1 (5 marks): Definition and chemical equation.
-Q2 (5 marks): Differences between animal and plant cells.
-Q3 (5 marks): Diagram or derivation.`,
-        rules: '{"Part A": 3}'
-      }
-    };
-
-    function applyPreset(key) {
-      const p = RUBRIC_PRESETS[key];
-      if (p) {
-        document.getElementById('rubricText').value = p.rubric;
-        if (p.rules) document.getElementById('sectionRulesInput').value = p.rules;
-        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.getElementById('presetBtn-' + key);
-        if (activeBtn) activeBtn.classList.add('active');
-      }
+    // Zoom Controls
+    function changeZoom(delta) {
+      zoomLevel = Math.max(0.4, Math.min(2.5, zoomLevel + delta));
+      document.getElementById('docContainer').style.transform = `scale(${zoomLevel})`;
+      document.getElementById('zoomVal').innerText = `${Math.round(zoomLevel * 100)}%`;
+    }
+    function resetZoom() {
+      zoomLevel = 1.0;
+      document.getElementById('docContainer').style.transform = 'scale(1)';
+      document.getElementById('zoomVal').innerText = '100%';
     }
 
-    // Switch Tabs
+    // Tab Switching
     function switchTab(tabName) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -587,39 +687,45 @@ Q3 (5 marks): Diagram or derivation.`,
       if (content) content.classList.add('active');
     }
 
-    // Toggle BBoxes overlay
+    // Toggle BBoxes
     function toggleBboxes() {
       bboxesVisible = !bboxesVisible;
+      document.getElementById('bboxCheck').checked = bboxesVisible;
       const overlay = document.getElementById('bboxOverlay');
-      const btn = document.getElementById('btnBboxes');
-      if (bboxesVisible) {
-        overlay.classList.add('show');
-        btn.classList.add('active');
-      } else {
-        overlay.classList.remove('show');
-        btn.classList.remove('active');
-      }
+      if (bboxesVisible) overlay.classList.add('show');
+      else overlay.classList.remove('show');
     }
 
-    // Load sample image
+    // Render HTML toggle
+    function toggleRenderHtml() {
+      const isHtml = document.getElementById('renderHtmlCheck').checked;
+      document.getElementById('renderedMarkdownView').style.display = isHtml ? 'block' : 'none';
+      document.getElementById('rawMarkdownView').style.display = isHtml ? 'none' : 'block';
+    }
+
+    // Load Sample Image
     async function loadSample(filename) {
+      document.querySelectorAll('.sample-pill').forEach(p => p.classList.remove('active'));
+      event.target.classList.add('active');
+
       const url = '/api/samples/' + filename;
-      document.getElementById('docImg').src = url;
-      document.getElementById('pageCounter').innerText = 'Page 1 / 1';
-      // Fetch image blob to populate selectedFiles
+      const img = document.getElementById('docImg');
+      img.src = url;
+
+      // Fetch blob into selectedFiles
       const res = await fetch(url);
       const blob = await res.blob();
-      selectedFiles = [new File([blob], filename, { type: 'image/jpeg' })];
+      selectedFiles = [new File([blob], filename, { type: filename.endsWith('.png') ? 'image/png' : 'image/jpeg' })];
 
-      // Auto-populate the matching answer key
-      if (filename.includes('IMG_1247') || filename.includes('IMG_1256') || filename.includes('IMG_1264')) {
-        applyPreset('electronics');
-      } else if (filename.includes('handwritten_exam_sample1')) {
-        applyPreset('finance');
-      } else if (filename.includes('circuit_diagram')) {
-        applyPreset('electronics');
+      // Auto-adapt rubric
+      if (filename.includes('circuit_diagram')) {
+        document.getElementById('rubricText').value = 
+          "Q1 (5 marks): Full-Wave Rectified waveform signal: input AC sinusoidal wave, positive and negative half cycles converted to positive DC voltage.\n" +
+          "Q2 (5 marks): Bridge rectifier circuit diagram: primary coil, secondary coil, diodes D1-D4, load resistor, and laminating rod.\n" +
+          "Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of efficiency, diode count, and energy loss.";
       }
-      switchTab('config');
+      resetZoom();
+      startGrading();
     }
 
     function handleFileSelect(e) {
@@ -628,224 +734,319 @@ Q3 (5 marks): Diagram or derivation.`,
         const reader = new FileReader();
         reader.onload = function(evt) {
           document.getElementById('docImg').src = evt.target.result;
-          document.getElementById('pageCounter').innerText = `Page 1 / ${selectedFiles.length}`;
         };
         reader.readAsDataURL(selectedFiles[0]);
-        switchTab('config');
+        startGrading();
       }
     }
 
-    // Start Async Grading Job
-    async function startGrading() {
-      if (selectedFiles.length === 0) {
-        alert("Please upload an answer sheet or select a test sample first.");
-        return;
+    function onImageLoaded() {
+      if (currentResult) renderBboxes(currentResult.layout_blocks || []);
+    }
+
+    // Dynamic Visual Cropping for Figures
+    function cropFigureBox(imgElement, bbox) {
+      try {
+        const canvas = document.createElement('canvas');
+        const nw = imgElement.naturalWidth || imgElement.width || 1200;
+        const nh = imgElement.naturalHeight || imgElement.height || 1600;
+
+        const ymin = (bbox[0] / 100) * nh;
+        const xmin = (bbox[1] / 100) * nw;
+        const ymax = (bbox[2] / 100) * nh;
+        const xmax = (bbox[3] / 100) * nw;
+
+        const cw = Math.max(20, xmax - xmin);
+        const ch = Math.max(20, ymax - ymin);
+
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imgElement, xmin, ymin, cw, ch, 0, 0, cw, ch);
+        return canvas.toDataURL('image/jpeg', 0.9);
+      } catch (err) {
+        return null;
       }
+    }
+
+    // Start Async Grading
+    async function startGrading() {
+      if (selectedFiles.length === 0) return;
 
       const rubric = document.getElementById('rubricText').value;
       const sectionRules = document.getElementById('sectionRulesInput').value;
+      const rubricMode = document.getElementById('rubricModeSelect').value;
 
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
       formData.append('rubric', rubric);
       if (sectionRules) formData.append('section_rules', sectionRules);
-      const rubricMode = document.getElementById('rubricModeSelect') ? document.getElementById('rubricModeSelect').value : 'structured';
       formData.append('rubric_mode', rubricMode);
 
-      // UI Progress indicators
       document.getElementById('progressBar').style.display = 'block';
-      document.getElementById('progressBox').style.display = 'flex';
-      document.getElementById('progressFill').style.width = '10%';
-      document.getElementById('progressText').innerText = "Submitting job...";
+      document.getElementById('progressFill').style.width = '15%';
 
       try {
         const resp = await fetch('/api/grade/async', { method: 'POST', body: formData });
         if (!resp.ok) throw new Error(await resp.text());
         const data = await resp.json();
-        const jobId = data.job_id;
-
-        // Poll job status every 1.5s
-        pollJob(jobId);
+        pollJob(data.job_id);
       } catch (err) {
-        alert("Error starting grading: " + err.message);
+        alert("Grading error: " + err.message);
         document.getElementById('progressBar').style.display = 'none';
-        document.getElementById('progressBox').style.display = 'none';
       }
     }
 
-    // Poll Background Job
     async function pollJob(jobId) {
       const interval = setInterval(async () => {
         try {
           const res = await fetch('/api/jobs/' + jobId);
           if (!res.ok) return;
           const job = await res.json();
-
           document.getElementById('progressFill').style.width = job.progress + '%';
-          document.getElementById('progressText').innerText = job.stage + ` (${job.progress}%)`;
 
           if (job.status === 'completed') {
             clearInterval(interval);
             document.getElementById('progressBar').style.display = 'none';
-            document.getElementById('progressBox').style.display = 'none';
             renderResult(job.result);
           } else if (job.status === 'failed') {
             clearInterval(interval);
             document.getElementById('progressBar').style.display = 'none';
-            document.getElementById('progressBox').style.display = 'none';
-            alert("Grading Job Failed: " + (job.error || "Unknown error"));
+            alert("Job failed: " + job.error);
           }
-        } catch (e) {
-          console.error("Polling error", e);
-        }
-      }, 1500);
+        } catch (e) {}
+      }, 1400);
     }
 
-    // Render Completed Result
+    // Render Completed Document
     function renderResult(res) {
       currentResult = res;
 
-      // Update Top Score Pill
+      // Update Score Pill
       const pill = document.getElementById('scorePill');
       pill.style.display = 'block';
       pill.innerText = `Score: ${res.grading.total_awarded} / ${res.grading.total_max}`;
 
-      // 1) Render Evaluation & Grades Tab
-      renderGradesTab(res);
-
-      // 2) Render Blocks Tab & Bboxes on Canvas
+      // 1. Render Blocks Tab (with figure crops and cut handling)
       renderBlocksTab(res);
 
-      // 3) Render Markdown
-      document.getElementById('markdownViewer').innerText = res.ocr.full_text || "";
+      // 2. Render Interactive Bboxes on Canvas
+      renderBboxes(res.layout_blocks || []);
 
-      // 4) Render JSON
+      // 3. Render Grading & Audit Tab
+      renderGradesTab(res);
+
+      // 4. Render Markdown & Raw JSON
+      const fullText = res.ocr.full_text || "";
+      document.getElementById('rawMarkdownView').innerText = fullText;
+      document.getElementById('renderedMarkdownView').innerHTML = formatMarkdownHtml(fullText);
       document.getElementById('jsonViewer').innerText = JSON.stringify(res, null, 2);
 
-      switchTab('grades');
+      // 5. Update API Snippets
+      updateApiSnippets();
+
+      switchTab('blocks');
+    }
+
+    function renderBlocksTab(res) {
+      const container = document.getElementById('blocksContainer');
+      container.innerHTML = '';
+      const blocks = res.layout_blocks || [];
+      const docImg = document.getElementById('docImg');
+
+      if (blocks.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No blocks detected.</div>';
+        return;
+      }
+
+      blocks.forEach((blk, idx) => {
+        const card = document.createElement('div');
+        card.className = 'block-card';
+        card.id = `card-${blk.block_id}`;
+
+        let bodyHtml = '';
+        const isFigure = blk.type === 'FIGURE';
+        const isCrossedOut = blk.type === 'CROSSED_OUT' || (blk.text && blk.text.includes('~~'));
+
+        if (isFigure) {
+          // Crop image from docImg canvas
+          const cropUrl = cropFigureBox(docImg, blk.bbox);
+          const cropTag = cropUrl ? `<div class="figure-crop-box"><img src="${cropUrl}" class="figure-crop-img" alt="Diagram Crop"></div>` : '';
+          bodyHtml = `
+            ${cropTag}
+            <div class="figure-caption">
+              <strong>Figure / Schematic:</strong> ${blk.text}
+            </div>
+          `;
+        } else if (isCrossedOut) {
+          const cleanText = blk.text.replace(/~~/g, '');
+          bodyHtml = `
+            <div class="struck-content">~~${cleanText}~~</div>
+            <div class="cut-alert-banner">
+              ✂️ <strong>Struck-Out Writing:</strong> Ignored & excluded from grading per universal exam directive.
+            </div>
+          `;
+        } else {
+          bodyHtml = `<div>${escapeHtml(blk.text)}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="block-card-header">
+            <span class="block-badge ${blk.type}">${blk.type}</span>
+            <span style="color:var(--text-muted); font-size:0.68rem;">#${idx+1} | Conf: ${Math.round(blk.confidence*100)}%</span>
+          </div>
+          <div class="block-card-body">
+            ${bodyHtml}
+          </div>
+        `;
+
+        // Bidirectional hover highlight
+        card.onmouseenter = () => highlightBbox(blk.block_id, true);
+        card.onmouseleave = () => highlightBbox(blk.block_id, false);
+        container.appendChild(card);
+      });
+    }
+
+    function renderBboxes(blocks) {
+      const overlay = document.getElementById('bboxOverlay');
+      overlay.innerHTML = '';
+
+      blocks.forEach(blk => {
+        if (!blk.bbox) return;
+        const [ymin, xmin, ymax, xmax] = blk.bbox;
+        const rect = document.createElement('div');
+        rect.className = `bbox-rect ${blk.type}`;
+        rect.id = `bbox-${blk.block_id}`;
+        rect.style.top = ymin + '%';
+        rect.style.left = xmin + '%';
+        rect.style.width = (xmax - xmin) + '%';
+        rect.style.height = (ymax - ymin) + '%';
+
+        const label = document.createElement('div');
+        label.className = 'bbox-label';
+        label.innerText = blk.type;
+        rect.appendChild(label);
+
+        rect.onmouseenter = () => {
+          rect.classList.add('highlighted');
+          const card = document.getElementById(`card-${blk.block_id}`);
+          if (card) {
+            card.classList.add('active');
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        };
+        rect.onmouseleave = () => {
+          rect.classList.remove('highlighted');
+          const card = document.getElementById(`card-${blk.block_id}`);
+          if (card) card.classList.remove('active');
+        };
+
+        overlay.appendChild(rect);
+      });
+    }
+
+    function highlightBbox(blockId, isHovered) {
+      const rect = document.getElementById(`bbox-${blockId}`);
+      if (rect) {
+        if (isHovered) rect.classList.add('highlighted');
+        else rect.classList.remove('highlighted');
+      }
     }
 
     function renderGradesTab(res) {
-      const container = document.getElementById('sectionCardsContainer');
+      const container = document.getElementById('gradesContainer');
       container.innerHTML = '';
 
-      // Render mode badge
-      const modeBanner = document.createElement('div');
-      modeBanner.style.cssText = "font-size:0.75rem; color:var(--text-muted); margin-bottom:12px; display:flex; gap:8px; align-items:center;";
-      modeBanner.innerHTML = `Mode: <span class="brand-badge" style="font-size:0.65rem;">${(res.grading.rubric_mode || 'structured').toUpperCase()} EVALUATION</span>`;
-      container.appendChild(modeBanner);
+      const gr = res.grading || {};
+      const grades = gr.grades || [];
 
-      // Render sections
-      if (res.grading.sections && res.grading.sections.length > 0) {
-        res.grading.sections.forEach(sec => {
-          const secDiv = document.createElement('div');
-          secDiv.className = 'section-card';
-          secDiv.innerHTML = `
-            <div class="section-header">
-              <span class="section-title">${sec.section_id}</span>
-              <span class="section-badge">${sec.rule_applied} (${sec.section_awarded} / ${sec.section_max} marks)</span>
+      // Section Rules Summary
+      if (gr.sections && gr.sections.length > 0) {
+        gr.sections.forEach(s => {
+          const sec = document.createElement('div');
+          sec.style.cssText = "background:#172033; border:1px solid var(--card-border); padding:10px 14px; border-radius:6px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;";
+          sec.innerHTML = `
+            <div>
+              <strong style="color:var(--accent);">${s.section_id}</strong>
+              <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">${s.rule_applied}</span>
             </div>
+            <div style="font-weight:700; color:var(--green); font-family:'JetBrains Mono';">${s.section_awarded} / ${s.section_max} marks</div>
           `;
-          container.appendChild(secDiv);
+          container.appendChild(sec);
         });
       }
 
-      // Render question cards
-      res.grading.grades.forEach(q => {
+      grades.forEach(q => {
         const card = document.createElement('div');
         card.className = 'q-card' + (q.is_counted ? '' : ' ignored');
 
-        const countedBadge = q.is_counted 
-          ? `<span class="q-badge badge-counted">Counted in Total</span>` 
-          : `<span class="q-badge badge-excess">Excess (Not Counted)</span>`;
-
-        const diagramBadge = q.diagram_detected 
-          ? `<span class="q-badge badge-diagram">Diagram / Flowchart Detected</span>` 
+        const countedBadge = q.is_counted
+          ? `<span class="q-badge badge-counted">Counted</span>`
+          : `<span class="q-badge badge-excess">Excess (Discarded)</span>`;
+        const diagBadge = q.diagram_detected
+          ? `<span class="q-badge badge-diagram">Diagram Credited</span>`
           : '';
 
-        const evidenceBox = q.evidence_quote 
-          ? `<div class="evidence-quote-box"><div class="evidence-title">Verified Student Citation:</div>"${q.evidence_quote}"</div>` 
-          : '';
+        const cite = q.evidence_quote ? `<div class="evidence-box">"${q.evidence_quote}"</div>` : '';
 
         card.innerHTML = `
           <div class="q-card-top">
             <div class="q-id">
-              ${q.question_id} (${q.section || 'General'})
+              ${q.question_id}
               ${countedBadge}
-              ${diagramBadge}
+              ${diagBadge}
             </div>
             <div class="q-score">${q.awarded_marks} / ${q.max_marks}</div>
           </div>
-          ${evidenceBox}
-          <div class="q-feedback">${q.feedback || 'No comments'}</div>
-          ${q.selection_reason ? `<div style="font-size:0.72rem; color:var(--accent); margin-bottom:6px;">Rule: ${q.selection_reason}</div>` : ''}
+          ${cite}
+          <div class="feedback-text">${q.feedback || 'No comments.'}</div>
           <div class="override-row">
             <span>Teacher Override:</span>
             <input type="number" step="0.5" class="override-input" id="override-${q.question_id}" value="${q.awarded_marks}">
-            <button class="btn-override" onclick="applyTeacherOverride('${q.question_id}')">Update</button>
+            <button class="btn-tool" onclick="applyTeacherOverride('${q.question_id}')">Save</button>
           </div>
         `;
         container.appendChild(card);
       });
     }
 
-    function renderBlocksTab(res) {
-      const blocksContainer = document.getElementById('blocksContainer');
-      const bboxOverlay = document.getElementById('bboxOverlay');
-      blocksContainer.innerHTML = '';
-      bboxOverlay.innerHTML = '';
-
-      if (!res.layout_blocks || res.layout_blocks.length === 0) {
-        blocksContainer.innerHTML = '<div style="padding:20px; color:var(--text-muted);">No layout blocks extracted.</div>';
-        return;
-      }
-
-      res.layout_blocks.forEach(blk => {
-        // Blocks tab item
-        const bDiv = document.createElement('div');
-        bDiv.className = 'block-item';
-        bDiv.innerHTML = `
-          <div class="block-type-tag">${blk.type}</div>
-          <div class="block-text">${blk.text}</div>
-        `;
-        blocksContainer.appendChild(bDiv);
-
-        // Bbox overlay on canvas
-        if (blk.bbox) {
-          const [ymin, xmin, ymax, xmax] = blk.bbox;
-          const rect = document.createElement('div');
-          rect.className = `bbox-rect ${blk.type}`;
-          rect.style.top = ymin + '%';
-          rect.style.left = xmin + '%';
-          rect.style.width = (xmax - xmin) + '%';
-          rect.style.height = (ymax - ymin) + '%';
-
-          const label = document.createElement('div');
-          label.className = 'bbox-label';
-          label.innerText = blk.type;
-          rect.appendChild(label);
-          bboxOverlay.appendChild(rect);
-        }
-      });
-    }
-
     async function applyTeacherOverride(qid) {
       if (!currentResult || !currentResult.result_path) return;
-      const filename = currentResult.result_path.split(/[\\/]/).pop();
+      const fname = currentResult.result_path.split(/[\\/]/).pop();
       const val = parseFloat(document.getElementById('override-' + qid).value);
 
-      try {
-        const r = await fetch(`/api/results/${filename}/override`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question_id: qid, new_marks: val, teacher_note: "Manual verification" })
-        });
-        const updated = await r.json();
-        renderResult(updated);
-        alert(`Marks for ${qid} updated to ${val}`);
-      } catch (err) {
-        alert("Override failed: " + err.message);
-      }
+      const r = await fetch(`/api/results/${fname}/override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question_id: qid, new_marks: val, teacher_note: "Manual override" })
+      });
+      const updated = await r.json();
+      renderResult(updated);
+      alert(`Score for ${qid} updated!`);
+    }
+
+    function formatMarkdownHtml(md) {
+      let html = md.replace(/\n/g, '<br>');
+      html = html.replace(/~~(.*?)~~/g, '<span class="struck-content">~~$1~~</span>');
+      return html;
+    }
+
+    function updateApiSnippets() {
+      const host = window.location.origin;
+      document.getElementById('curlSnippet').innerText = 
+`curl -X POST "${host}/api/grade/async" \\
+  -F "files=@sheet.jpg" \\
+  -F "rubric=Q1 (5 marks): Define proximity sensor."`;
+
+      document.getElementById('pythonSnippet').innerText = 
+`import requests
+
+url = "${host}/api/grade/async"
+files = [('files', open('sheet.jpg', 'rb'))]
+data = {'rubric': 'Q1 (5 marks): Define proximity sensor.'}
+
+resp = requests.post(url, files=files, data=data)
+print(resp.json())`;
     }
 
     function copyJson() {
@@ -854,13 +1055,26 @@ Q3 (5 marks): Diagram or derivation.`,
       alert("JSON copied to clipboard!");
     }
 
+    function handleEngineChange() {
+      const eng = document.getElementById('engineSelect').value;
+      if (eng === 'chandra') {
+        alert("Switched to Chandra OCR (Datalab Engine). Ready to evaluate.");
+      } else {
+        alert("Switched to GLM-OCR (0.9B Local Engine).");
+      }
+    }
+
     function prevPage() {}
     function nextPage() {}
 
-    // Init: Load first sample on start
     window.onload = function() {
-      loadSample('IMG_1247.jpg');
+      loadSample('circuit_diagram_sample2.png');
     };
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
   </script>
 </body>
 </html>

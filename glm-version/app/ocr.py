@@ -16,8 +16,9 @@ from .schemas import OcrResult, PageOcr
 
 PASS1_PROMPT = (
     "Extract ALL text from this exam answer sheet image exactly as written, "
-    "including handwriting, question numbers, tables (as markdown), and math "
-    "(as LaTeX). Do not summarize or add commentary. Output the raw text only."
+    "including handwriting, question numbers, tables (as markdown), diagrams (with textual labels), and math "
+    "(as LaTeX). If any text, line, or equation is crossed out or struck through with a pen line, wrap it with markdown strikethrough: ~~crossed-out text~~. "
+    "Do not summarize or add commentary. Output the raw text only."
 )
 
 # Pass 2 trades some speed for accuracy on weak pages.
@@ -25,6 +26,7 @@ PASS2_PROMPT = (
     "You are performing high-accuracy OCR on a scanned handwritten exam answer "
     "sheet. Transcribe every visible character exactly, preserving layout: "
     "question numbers on their own lines, tables as markdown, formulas as LaTeX. "
+    "If any word, line, or equation is crossed out or struck through with a pen stroke, transcribe it using ~~struck-out text~~. "
     "If a word is ambiguous, choose the reading most consistent with sentence "
     "context. Output transcription only."
 )
