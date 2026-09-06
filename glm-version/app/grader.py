@@ -121,7 +121,7 @@ class GraderError(RuntimeError):
 def sanitize_untrusted_transcript(text: str) -> str:
     """Neutralizes delimiter-breaking and prompt-injection attempts by student handwriting."""
     # 1. Escape all XML / HTML delimiters that could close or mimic quarantine blocks
-    s = re.sub(r"</?[a-zA-Z0-9_\-]+.*?>", " ", text)
+    s = re.sub(r"</?[a-zA-Z0-9_\-]+.*?>", "[ESCAPED_TRANSCRIPT_TAG]", text)
     # 2. Neutralize markdown heading markers commonly used to mimic system prompts
     s = re.sub(r"^(#+|\={3,}|\-{3,})\s*", "> ", s, flags=re.MULTILINE)
     # 3. Aggressively strip prompt injection and instruction lines from student text
@@ -270,58 +270,17 @@ def apply_section_rules(
     return final_grades, section_summaries, round(total_awarded, 2), round(total_max, 2)
 
 
-def extract_layout_blocks(full_text: str, page_count: int = 1) -> List[LayoutBlock]:
+def extract_layout_blocks(
+    full_text: str,
+    page_count: int = 1,
+    jpegs: Optional[List[bytes]] = None,
+) -> List[LayoutBlock]:
     """Segments OCR document text into structured Datalab-style layout blocks
-    (FIGURE, TABLE, CROSSED_OUT, QUESTION, PAGEHEADER, TEXT)
-    with normalized bounding box estimates [ymin, xmin, ymax, xmax].
+    with pixel-accurate bounding boxes using computer vision & benchmark alignment.
     """
-    blocks: List[LayoutBlock] = []
-    lines = [line.strip() for line in full_text.splitlines() if line.strip()]
-    if not lines:
-        return blocks
+    from .layout import extract_layout_blocks as _layout_extract
+    return _layout_extract(full_text, page_count=page_count, jpegs=jpegs)
 
-    block_id_counter = 0
-    current_y = 6.0
-    step_y = min(16.0, 88.0 / max(len(lines), 1))
-
-    for idx, line in enumerate(lines):
-        block_id_counter += 1
-        b_type = "TEXT"
-        h = step_y
-
-        # Layout classification matching Datalab standard
-        if "~~" in line or "[cancelled]" in line.lower() or "[struck" in line.lower():
-            b_type = "CROSSED_OUT"
-            h = min(step_y, 8.0)
-        elif "|" in line or any(t in line.lower() for t in ["table", "column", "half wave", "full wave"]):
-            b_type = "TABLE"
-            h = max(step_y * 1.5, 14.0)
-        elif any(term in line.lower() for term in ["diagram", "circuit", "flowchart", "graph", "schematic", "rectifier", "coil", "diode"]):
-            b_type = "FIGURE"
-            h = max(step_y * 2.0, 20.0)
-        elif re.match(r"^(q\s*\d+|question\s*\d+|\d+\.)", line, re.IGNORECASE):
-            b_type = "QUESTION"
-            h = min(step_y, 8.0)
-        elif idx == 0 and any(w in line.lower() for w in ["exam", "university", "college", "test", "paper", "roll"]):
-            b_type = "PAGEHEADER"
-            h = min(step_y, 8.0)
-
-        ymin = round(current_y, 1)
-        ymax = round(min(96.0, current_y + h - 1.5), 1)
-        bbox = [ymin, 8.0, ymax, 92.0]
-        current_y = min(96.0, current_y + h)
-
-        blocks.append(
-            LayoutBlock(
-                block_id=f"blk_{block_id_counter}",
-                type=b_type,
-                page=1,
-                text=line,
-                confidence=0.90 if b_type in ("FIGURE", "TABLE") else 0.85,
-                bbox=bbox,
-            )
-        )
-    return blocks
 
 
 def _parse_grade(

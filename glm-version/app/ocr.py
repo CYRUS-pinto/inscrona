@@ -90,7 +90,7 @@ def _call_ocr(jpeg: bytes, prompt: str) -> str:
 def _ocr_page(jpeg: bytes, page_no: int) -> PageOcr:
     text = _call_ocr(jpeg, PASS1_PROMPT)
     if not text or not text.strip():
-        return PageOcr(page=page_no, text="[BLANK PAGE / UNATTEMPTED]", confidence=0.0)
+        raise OcrError(f"OCR returned empty text for page {page_no}")
     best = PageOcr(page=page_no, text=text, confidence=_heuristic_confidence(text))
 
     # Pass 2: high-accuracy retry on weak pages, keep the better reading.

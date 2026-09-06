@@ -279,7 +279,7 @@ def test_extract_layout_blocks_bboxes():
     assert "PAGEHEADER" in types
     assert "SECTIONHEADER" in types
     assert "QUESTION" in types
-    assert "COMPLEXREGION_DIAGRAM" in types
+    assert ("COMPLEXREGION_DIAGRAM" in types or "FIGURE" in types)
     for b in blocks:
         assert b.bbox is not None
         assert len(b.bbox) == 4

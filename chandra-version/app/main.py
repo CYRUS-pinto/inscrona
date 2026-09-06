@@ -116,7 +116,7 @@ def _process_pipeline(
     if job_id:
         job_manager.update_progress(job_id, 70, "Segmenting document layout & bboxes")
 
-    layout_blocks = extract_layout_blocks(ocr_result.full_text, len(jpegs))
+    layout_blocks = extract_layout_blocks(ocr_result.full_text, len(jpegs), jpegs=jpegs)
 
     if job_id:
         job_manager.update_progress(job_id, 85, f"Grading with Llama 3.2 [{rubric_mode.upper()} MODE] & applying option rules")
@@ -447,8 +447,12 @@ def download_gradebook_csv(batch_id: str):
     return FileResponse(path, media_type="text/csv", filename=f"{safe}_gradebook.csv")
 
 
-# Static mounts for uploaded images and web UI
+# Static mounts for uploaded images, samples, and web UI
 app.mount("/uploads", StaticFiles(directory=str(config.UPLOADS_DIR)), name="uploads")
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():
+    samples_dir = static_dir / "samples"
+    if samples_dir.exists():
+        app.mount("/samples", StaticFiles(directory=str(samples_dir)), name="samples")
     app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+

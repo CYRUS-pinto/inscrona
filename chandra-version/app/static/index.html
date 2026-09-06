@@ -3,32 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inscora Enterprise — Document & Exam AI Playground</title>
+  <title>Inscora Playground — Datalab & Chandra Grade Document & Exam AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #090d16;
       --card-bg: #111726;
       --card-border: #1e293b;
-      --text: #f8fafc;
+      --text: #f1f5f9;
       --text-muted: #94a3b8;
       --accent: #38bdf8;
-      --accent-hover: #0284c7;
-      --green: #22c55e;
+      --green: #10b981;
       --amber: #f59e0b;
       --red: #ef4444;
-      --purple: #a855f7;
-      --purple-bg: rgba(168, 85, 247, 0.15);
-      --teal: #14b8a6;
+      /* Datalab Official Semantic Color System */
+      --datalab-figure: #9b51e0;
+      --datalab-text: #2563eb;
+      --datalab-table: #059669;
+      --datalab-footer: #db2777;
+      --datalab-crossed: #dc2626;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Geist', -apple-system, sans-serif; }
     body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* Top Navigation Bar */
+    /* Top Navigation Bar (Matching Datalab Style) */
     header {
-      height: 54px;
+      height: 52px;
       border-bottom: 1px solid var(--card-border);
       background: #0d121f;
       display: flex;
@@ -37,21 +39,15 @@
       padding: 0 16px;
       z-index: 10;
     }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; }
-    .brand-badge {
-      font-size: 0.68rem;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(56,189,248,0.15);
-      color: var(--accent);
-      border: 1px solid rgba(56,189,248,0.3);
-      font-weight: 600;
-      text-transform: uppercase;
-    }
+    .brand-area { display: flex; align-items: center; gap: 12px; }
+    .brand { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.03em; display: flex; align-items: center; gap: 6px; }
+    .brand-icon { color: var(--accent); font-size: 1.2rem; }
     .breadcrumb { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-    .breadcrumb span { color: var(--text); font-weight: 600; }
+    .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--text); }
+    .breadcrumb span { color: var(--text); font-weight: 500; }
     
-    .header-controls { display: flex; align-items: center; gap: 12px; }
+    .header-controls { display: flex; align-items: center; gap: 10px; }
     .engine-picker {
       background: #1e293b;
       border: 1px solid #334155;
@@ -63,29 +59,77 @@
       outline: none;
       cursor: pointer;
     }
-    .status-pill {
-      font-size: 0.72rem;
+    .engine-picker:focus { border-color: var(--accent); }
+
+    /* Zoom Controls Pill matching Datalab */
+    .zoom-pill {
+      display: flex;
+      align-items: center;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 2px 4px;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .zoom-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      width: 26px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 50%;
+      transition: all 0.15s;
+    }
+    .zoom-btn:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+    .zoom-val { padding: 0 8px; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+    .zoom-reset { font-size: 0.7rem; color: var(--text-muted); padding: 0 6px; cursor: pointer; }
+    .zoom-reset:hover { color: var(--text); }
+
+    .header-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
-      color: var(--text-muted);
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #1e293b;
-      border: 1px solid #334155;
+      transition: all 0.15s;
     }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .header-btn:hover { background: #283548; border-color: var(--accent); }
+    .header-btn.primary { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    .header-btn.primary:hover { background: #0369a1; }
+
+    /* Notification Banner */
+    .notice-banner {
+      background: rgba(16, 185, 129, 0.1);
+      border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 5px 16px;
+      font-size: 0.76rem;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
 
     /* Main Split Workspace */
     .workspace {
       display: flex;
-      height: calc(100vh - 54px);
+      height: calc(100vh - 84px);
       width: 100vw;
     }
 
     /* Left Pane: Document Canvas */
     .left-pane {
-      flex: 1.15;
+      flex: 1.1;
       border-right: 1px solid var(--card-border);
       background: #0b0f19;
       display: flex;
@@ -93,64 +137,55 @@
       position: relative;
     }
     .canvas-toolbar {
-      height: 44px;
+      height: 42px;
       background: #111726;
       border-bottom: 1px solid var(--card-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 14px;
-      font-size: 0.8rem;
     }
-    .toolbar-group { display: flex; align-items: center; gap: 6px; }
-    .btn-tool {
+    .page-nav { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 600; }
+    .page-btn {
       background: #1e293b;
       border: 1px solid #334155;
       color: var(--text);
       padding: 4px 10px;
-      border-radius: 5px;
-      font-size: 0.76rem;
-      font-weight: 500;
+      border-radius: 4px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.15s ease;
+      font-size: 0.75rem;
     }
-    .btn-tool:hover { background: #334155; }
-    .btn-tool.active { background: var(--accent); color: #090d16; font-weight: 600; border-color: var(--accent); }
+    .page-btn:hover { border-color: var(--accent); }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .zoom-indicator { font-size: 0.76rem; font-family: 'JetBrains Mono', monospace; color: var(--text-muted); min-width: 42px; text-align: center; }
-
-    .canvas-area {
+    .canvas-viewport {
       flex: 1;
       overflow: auto;
-      padding: 20px;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      background: radial-gradient(#1e293b 1px, transparent 1px);
-      background-size: 20px 20px;
+      padding: 24px;
+      background: radial-gradient(circle, #131b2e 10%, #0b0f19 90%);
     }
-    .doc-container {
+    .doc-wrapper {
       position: relative;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.7);
-      border-radius: 6px;
-      overflow: hidden;
-      background: #ffffff;
-      transform-origin: center center;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.65);
+      border-radius: 4px;
+      display: inline-block;
       transition: transform 0.15s ease;
+      transform-origin: center center;
+      background: #fff;
     }
-    .doc-img {
+    #docImg {
       display: block;
-      max-width: 100%;
+      max-width: 540px;
       max-height: 72vh;
-      object-fit: contain;
+      border-radius: 4px;
       user-select: none;
     }
 
-    /* Bounding Boxes Layer */
+    /* Datalab Bounding Boxes Layer */
     .bbox-overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -160,40 +195,49 @@
     .bbox-overlay.show { display: block; }
     .bbox-rect {
       position: absolute;
-      border: 2px solid;
-      border-radius: 3px;
+      border: 1.5px solid;
+      border-radius: 2px;
       pointer-events: auto;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .bbox-rect.FIGURE { border-color: var(--purple); background: rgba(168, 85, 247, 0.18); }
-    .bbox-rect.TABLE { border-color: var(--teal); background: rgba(20, 184, 166, 0.18); }
-    .bbox-rect.QUESTION { border-color: var(--green); background: rgba(34, 197, 94, 0.15); }
-    .bbox-rect.TEXT { border-color: var(--accent); background: rgba(56, 189, 248, 0.12); }
-    .bbox-rect.CROSSED_OUT { border-color: var(--red); border-style: dashed; background: rgba(239, 68, 68, 0.22); }
+    /* Official Datalab Color System */
+    .bbox-rect.FIGURE { border-color: var(--datalab-figure); background: rgba(155, 81, 224, 0.12); }
+    .bbox-rect.TEXT { border-color: var(--datalab-text); background: rgba(37, 99, 235, 0.10); }
+    .bbox-rect.TABLE, .bbox-rect.LISTGROUP { border-color: var(--datalab-table); background: rgba(5, 150, 105, 0.10); }
+    .bbox-rect.PAGEFOOTER, .bbox-rect.PAGEHEADER { border-color: var(--datalab-footer); background: rgba(219, 39, 119, 0.10); }
+    .bbox-rect.CROSSED_OUT { border: 2px dashed var(--datalab-crossed); background: rgba(220, 38, 38, 0.14); }
+    .bbox-rect.QUESTION { border-color: #16a34a; background: rgba(22, 163, 74, 0.10); }
+
     .bbox-rect:hover, .bbox-rect.highlighted {
+      border-width: 2.5px;
       box-shadow: 0 0 12px currentColor;
-      border-width: 3px;
-      z-index: 5;
+      z-index: 10;
     }
 
-    .bbox-label {
+    /* Non-intrusive Hover Tooltip (Never occludes student handwriting) */
+    .bbox-tooltip {
+      display: none;
       position: absolute;
-      top: -16px; left: -2px;
+      top: -22px; left: -1px;
       font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      padding: 1px 5px;
-      border-radius: 3px 3px 0 0;
+      padding: 2px 6px;
+      border-radius: 3px;
       color: #ffffff;
       white-space: nowrap;
+      z-index: 20;
+      font-family: 'JetBrains Mono', monospace;
     }
-    .bbox-rect.FIGURE .bbox-label { background: var(--purple); }
-    .bbox-rect.TABLE .bbox-label { background: var(--teal); }
-    .bbox-rect.QUESTION .bbox-label { background: var(--green); }
-    .bbox-rect.TEXT .bbox-label { background: #0284c7; }
-    .bbox-rect.CROSSED_OUT .bbox-label { background: var(--red); }
+    .bbox-rect.FIGURE .bbox-tooltip { background: var(--datalab-figure); }
+    .bbox-rect.TEXT .bbox-tooltip { background: var(--datalab-text); }
+    .bbox-rect.TABLE .bbox-tooltip, .bbox-rect.LISTGROUP .bbox-tooltip { background: var(--datalab-table); }
+    .bbox-rect.PAGEFOOTER .bbox-tooltip, .bbox-rect.PAGEHEADER .bbox-tooltip { background: var(--datalab-footer); }
+    .bbox-rect.CROSSED_OUT .bbox-tooltip { background: var(--datalab-crossed); }
+    .bbox-rect.QUESTION .bbox-tooltip { background: #16a34a; }
+    .bbox-rect:hover .bbox-tooltip, .bbox-rect.highlighted .bbox-tooltip { display: block; }
 
     /* Floating BBoxes Pill matching Datalab */
     .floating-bbox-pill {
@@ -203,16 +247,17 @@
       background: #0f172a;
       border: 1px solid #334155;
       color: var(--text);
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 999px;
-      font-size: 0.76rem;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      gap: 7px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
       z-index: 8;
+      user-select: none;
     }
     .floating-bbox-pill input { accent-color: var(--accent); cursor: pointer; }
 
@@ -226,7 +271,7 @@
       gap: 8px;
       overflow-x: auto;
     }
-    .samples-title { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+    .samples-title { font-size: 0.68rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
     .sample-pill {
       font-size: 0.72rem;
       padding: 3px 9px;
@@ -241,503 +286,516 @@
     .sample-pill:hover { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.1); }
     .sample-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.15); font-weight: 600; }
 
-    /* Right Pane: Inspector Tabs */
+    /* Right Pane: Results Tabs */
     .right-pane {
-      flex: 1.25;
+      flex: 1.35;
       background: #090d16;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-    .tabs-header {
+    .main-tabs-bar {
       display: flex;
       align-items: center;
-      background: #111726;
+      background: #0d121f;
       border-bottom: 1px solid var(--card-border);
-      padding: 0 14px;
-      height: 44px;
-      gap: 2px;
+      padding: 0 16px;
+      height: 42px;
+      gap: 16px;
     }
-    .tab-btn {
-      background: transparent;
-      border: none;
+    .main-tab {
       color: var(--text-muted);
-      padding: 10px 12px;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 600;
+      padding: 10px 0;
       cursor: pointer;
       position: relative;
-      transition: color 0.15s;
-      display: flex;
-      align-items: center;
-      gap: 5px;
     }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--accent); }
-    .tab-btn.active::after {
+    .main-tab.active { color: var(--text); }
+    .main-tab.active::after {
       content: '';
       position: absolute;
       bottom: -1px; left: 0; right: 0;
       height: 2px;
       background: var(--accent);
     }
-    .tab-controls-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    .sub-tabs-header {
+      display: flex;
+      align-items: center;
+      background: #111726;
+      border-bottom: 1px solid var(--card-border);
+      padding: 0 14px;
+      height: 40px;
+      gap: 4px;
+    }
+    .sub-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .sub-tab-btn:hover { color: var(--text); }
+    .sub-tab-btn.active { color: var(--accent); background: rgba(56,189,248,0.08); }
+
+    .sub-tab-controls-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
     .html-toggle {
       font-size: 0.75rem;
       color: var(--text-muted);
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       cursor: pointer;
       user-select: none;
     }
     .html-toggle input { accent-color: var(--accent); }
     .score-summary-pill {
-      background: rgba(34,197,94,0.15);
-      border: 1px solid rgba(34,197,94,0.35);
+      background: rgba(16,185,129,0.15);
+      border: 1px solid rgba(16,185,129,0.35);
       color: var(--green);
       font-weight: 700;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       padding: 3px 10px;
       border-radius: 999px;
       display: none;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     /* Tab Content Views */
     .tab-content {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
       display: none;
     }
     .tab-content.active { display: block; }
 
-    /* Blocks Tab (Matching Datalab Screenshot) */
+    /* Blocks Tab (Pixel-Accurate to Datalab Screenshot) */
+    .blocks-stream { padding: 0; }
     .block-card {
-      background: #111726;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      margin-bottom: 12px;
-      overflow: hidden;
-      transition: all 0.15s ease;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 16px 20px;
+      transition: background 0.15s;
     }
-    .block-card:hover, .block-card.active { border-color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-    .block-card-header {
-      padding: 6px 12px;
-      background: #172033;
-      border-bottom: 1px solid var(--card-border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.72rem;
-    }
-    .block-badge {
-      font-weight: 700;
-      font-size: 0.68rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 2px 6px;
-      border-radius: 3px;
-      color: #fff;
-    }
-    .block-badge.FIGURE { background: var(--purple); }
-    .block-badge.TABLE { background: var(--teal); }
-    .block-badge.QUESTION { background: var(--green); }
-    .block-badge.TEXT { background: #0284c7; }
-    .block-badge.CROSSED_OUT { background: var(--red); }
+    .block-card:hover, .block-card.active { background: rgba(255,255,255,0.025); }
 
-    .block-card-body { padding: 12px; font-size: 0.84rem; line-height: 1.5; }
-    
-    /* Figure Preview Box */
+    .datalab-block-type {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .datalab-block-type.FIGURE { color: var(--datalab-figure); }
+    .datalab-block-type.TEXT { color: var(--datalab-text); }
+    .datalab-block-type.TABLE, .datalab-block-type.LISTGROUP { color: var(--datalab-table); }
+    .datalab-block-type.PAGEFOOTER, .datalab-block-type.PAGEHEADER { color: var(--datalab-footer); }
+    .datalab-block-type.CROSSED_OUT { color: var(--datalab-crossed); }
+    .datalab-block-type.QUESTION { color: #16a34a; }
+
+    .block-card-body {
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+
+    /* Dynamic Visual Figure Preview Box */
     .figure-crop-box {
       width: 100%;
-      max-height: 220px;
       background: #ffffff;
+      border: 1px solid rgba(255,255,255,0.15);
       border-radius: 4px;
       overflow: hidden;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #334155;
+      padding: 12px;
     }
-    .figure-crop-img { max-width: 100%; max-height: 220px; object-fit: contain; }
+    .figure-crop-img {
+      max-width: 100%;
+      max-height: 240px;
+      object-fit: contain;
+      border-radius: 2px;
+    }
     .figure-caption {
-      font-size: 0.78rem;
+      font-size: 0.83rem;
       color: #cbd5e1;
-      line-height: 1.4;
-      background: rgba(168, 85, 247, 0.08);
-      padding: 8px 10px;
-      border-left: 3px solid var(--purple);
-      border-radius: 0 4px 4px 0;
+      line-height: 1.5;
     }
 
-    /* Strikethrough & Cut Styling */
+    /* Datalab-Style Structured Comparison Table */
+    .datalab-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 0.83rem;
+      background: rgba(255,255,255,0.02);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .datalab-table th, .datalab-table td {
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .datalab-table th {
+      background: rgba(255,255,255,0.05);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .datalab-table tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* Crossed-Out / Cut Content Directive Warning */
     .struck-content {
       text-decoration: line-through;
       color: #f87171;
-      background: rgba(239, 68, 68, 0.1);
-      padding: 2px 6px;
-      border-radius: 3px;
-      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 6px;
     }
     .cut-alert-banner {
-      font-size: 0.72rem;
+      background: rgba(220, 38, 38, 0.12);
+      border-left: 3px solid #ef4444;
+      padding: 8px 12px;
+      border-radius: 0 4px 4px 0;
+      font-size: 0.78rem;
       color: #fca5a5;
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      padding: 4px 8px;
-      border-radius: 4px;
       margin-top: 6px;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
 
-    /* Grading Tab */
-    .q-card {
+    /* Progress & Loading */
+    .progress-bar-container {
+      height: 3px;
+      background: #1e293b;
+      display: none;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #a855f7);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Code views */
+    .code-viewer {
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e2e8f0;
+      background: #090d16;
+    }
+
+    /* Modal for API Code */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
       background: #111726;
       border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 12px 14px;
-      margin-bottom: 10px;
-      transition: border-color 0.15s;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 680px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
     }
-    .q-card.ignored { opacity: 0.65; border-left: 3px solid #64748b; }
-    .q-card:not(.ignored) { border-left: 3px solid var(--green); }
-    .q-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .q-id { font-weight: 700; font-size: 0.9rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
-    .q-score { font-weight: 700; font-size: 1rem; color: var(--green); font-family: 'JetBrains Mono', monospace; }
-    .q-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 999px; font-weight: 600; text-transform: uppercase; }
-    .badge-counted { background: rgba(34,197,94,0.18); color: var(--green); }
-    .badge-excess { background: rgba(148,163,184,0.18); color: var(--text-muted); }
-    .badge-diagram { background: rgba(168,85,247,0.18); color: var(--purple); }
-    
-    .evidence-box {
-      background: #0b0f19;
-      border: 1px solid var(--card-border);
-      border-left: 3px solid var(--accent);
-      padding: 8px 10px;
-      border-radius: 0 4px 4px 0;
-      font-size: 0.78rem;
-      color: #cbd5e1;
-      margin-bottom: 8px;
-      font-style: italic;
-    }
-    .feedback-text { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
-
-    .override-row {
+    .modal-header {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 8px;
-      padding-top: 8px;
-      border-top: 1px dashed var(--card-border);
-      font-size: 0.75rem;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
     }
-    .override-input {
-      width: 60px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: var(--text);
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 0.78rem;
-      text-align: center;
-    }
-
-    /* Progress and Code Viewers */
-    .code-viewer {
-      background: #0b0f19;
-      border: 1px solid var(--card-border);
-      padding: 14px;
-      border-radius: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      color: #e2e8f0;
-      white-space: pre-wrap;
-      overflow-x: auto;
-      line-height: 1.5;
-    }
-    .progress-bar-container { height: 3px; width: 100%; background: #1e293b; display: none; }
-    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width 0.3s ease; }
-
-    /* Configuration Panel */
-    .config-card { background: #111726; border: 1px solid var(--card-border); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
-    .config-title { font-weight: 700; font-size: 0.88rem; color: var(--accent); margin-bottom: 12px; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
-    .form-group textarea, .form-group input, .form-group select {
-      width: 100%;
-      background: #0b0f19;
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      padding: 8px;
-      border-radius: 5px;
-      font-size: 0.8rem;
-      outline: none;
-    }
-    .form-group textarea { height: 110px; font-family: 'JetBrains Mono', monospace; resize: vertical; }
-    .btn-parse {
-      width: 100%;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      color: #fff;
+    .modal-close {
+      background: transparent;
       border: none;
-      padding: 10px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-size: 1.2rem;
       cursor: pointer;
-      transition: opacity 0.15s;
     }
-    .btn-parse:hover { opacity: 0.92; }
   </style>
 </head>
 <body>
 
   <!-- Top Navigation Bar -->
   <header>
-    <div style="display:flex; align-items:center; gap:16px;">
+    <div class="brand-area">
       <div class="brand">
-        <span>Inscora</span>
-        <span class="brand-badge">Playground</span>
+        <span class="brand-icon">❖</span> Inscora
       </div>
       <div class="breadcrumb">
-        Public Playground / <span>Document & Exam AI</span>
+        <span>Public Playground</span> / <span id="breadcrumbDocId">11bb79ed-a506-40f1-b316-91b52799fb4b</span> / <span>view</span>
       </div>
     </div>
+
     <div class="header-controls">
-      <select class="engine-picker" id="engineSelect" onchange="handleEngineChange()">
-        <option value="glm">⚡ GLM-OCR (0.9B Local SOTA)</option>
-        <option value="chandra">🔬 Chandra OCR (Datalab SOTA)</option>
-      </select>
-      <div class="status-pill">
-        <div class="status-dot"></div>
-        <span id="systemStatus">Colab T4 GPU (qwen2.5:7b)</span>
+      <!-- Zoom Controls Pill -->
+      <div class="zoom-pill">
+        <button class="zoom-btn" onclick="zoom(-10)">-</button>
+        <span class="zoom-val" id="zoomVal">100%</span>
+        <button class="zoom-btn" onclick="zoom(+10)">+</button>
+        <span class="zoom-reset" onclick="resetZoom()">Reset</span>
       </div>
-      <button class="btn-tool" onclick="switchTab('config')">⚙️ Configuration</button>
+
+      <!-- Engine Switcher -->
+      <select class="engine-picker" id="engineSelect" onchange="switchEngine(this.value)">
+        <option value="glm-ocr" selected>⚡ GLM-OCR (0.9B Local Colab T4)</option>
+        <option value="chandra">⚡ Chandra OCR (Datalab SOTA API)</option>
+      </select>
+
+      <button class="header-btn" onclick="openApiModal()">View API code</button>
+      <button class="header-btn primary" onclick="document.getElementById('fileInput').click()">+ Upload Exam Scan</button>
+      <input type="file" id="fileInput" accept="image/*,.heic,.pdf" style="display:none" onchange="handleFileUpload(event)">
     </div>
   </header>
 
-  <!-- Real-Time Top Progress Bar -->
+  <!-- Notification Banner matching Datalab -->
+  <div class="notice-banner">
+    <div>
+      ✓ <strong>Layout segmentation complete</strong> — extracted physical figures, tables, text lines, and crossed-out handwriting blocks.
+    </div>
+    <div style="font-family:'JetBrains Mono'; font-size:0.72rem; color:var(--text-muted);">
+      Colab GPU: Tesla T4 (Active Hot-Reload)
+    </div>
+  </div>
+
   <div class="progress-bar-container" id="progressBar">
-    <div class="progress-bar-fill" id="progressFill"></div>
+    <div class="progress-fill" id="progressFill"></div>
   </div>
 
   <!-- Main Workspace -->
   <div class="workspace">
-
-    <!-- Left Document Viewport -->
+    <!-- Left Pane: Document Canvas with Bboxes -->
     <div class="left-pane">
       <div class="canvas-toolbar">
-        <div class="toolbar-group">
-          <button class="btn-tool" onclick="prevPage()">◀ Prev</button>
-          <span id="pageCounter" style="font-size:0.76rem; font-weight:600;">Page 1 / 1</span>
-          <button class="btn-tool" onclick="nextPage()">Next ▶</button>
+        <div class="page-nav">
+          <button class="page-btn" id="prevPageBtn" disabled>Prev</button>
+          <span id="pageCounter">Page 1 / 1</span>
+          <button class="page-btn" id="nextPageBtn" disabled>Next</button>
         </div>
-        <div class="toolbar-group">
-          <span class="zoom-indicator" id="zoomVal">100%</span>
-          <button class="btn-tool" onclick="changeZoom(-0.1)">−</button>
-          <button class="btn-tool" onclick="changeZoom(0.1)">+</button>
-          <button class="btn-tool" onclick="resetZoom()">Reset</button>
-          <input type="file" id="fileUpload" accept="image/*,.heic,.pdf" multiple style="display:none;" onchange="handleFileSelect(event)">
-          <button class="btn-tool active" onclick="document.getElementById('fileUpload').click()">+ Upload File</button>
-        </div>
+        <button class="header-btn" style="padding:3px 8px; font-size:0.72rem;" onclick="startGrading()">⚡ Run AI Evaluation</button>
       </div>
 
-      <!-- Canvas Area with Image & Interactive Bboxes -->
-      <div class="canvas-area" id="canvasArea">
-        <div class="doc-container" id="docContainer">
-          <img src="" id="docImg" class="doc-img" alt="Document Sheet" onload="onImageLoaded()">
+      <div class="canvas-viewport" id="viewport">
+        <div class="doc-wrapper" id="docWrapper">
+          <img id="docImg" src="/samples/circuit_diagram_sample2.jpg" alt="Exam Sheet" onload="onImageLoaded()">
           <div class="bbox-overlay show" id="bboxOverlay"></div>
         </div>
 
-        <!-- Floating Bboxes Pill matching Datalab -->
-        <div class="floating-bbox-pill" onclick="toggleBboxes()">
-          <input type="checkbox" id="bboxCheck" checked onclick="event.stopPropagation(); toggleBboxes();">
-          <label for="bboxCheck" style="cursor:pointer;">Bboxes</label>
+        <!-- Floating Bboxes Checkbox Pill -->
+        <div class="floating-bbox-pill" onclick="toggleBboxes(event)">
+          <input type="checkbox" id="bboxToggle" checked>
+          <label for="bboxToggle" style="cursor:pointer">Bboxes</label>
         </div>
       </div>
 
-      <!-- Real-World Test Samples Tray -->
+      <!-- Real Samples Tray -->
       <div class="samples-tray">
         <span class="samples-title">Real Test Samples:</span>
-        <span class="sample-pill active" onclick="loadSample('circuit_diagram_sample2.png')">Rectifier & Waveforms (Screenshot Match)</span>
-        <span class="sample-pill" onclick="loadSample('IMG_1247.jpg')">Student Sheet (Sensors)</span>
-        <span class="sample-pill" onclick="loadSample('IMG_1256.jpg')">Math Derivation</span>
-        <span class="sample-pill" onclick="loadSample('fabricated_alice_excellent.jpg')">Alice (High Achiever)</span>
-        <span class="sample-pill" onclick="loadSample('fabricated_charlie_jailbreak.jpg')">Charlie (Jailbreak Test)</span>
+        <div class="sample-pill active" onclick="loadSample('circuit_diagram_sample2.jpg', this)">Rectifier & Waveforms (Screenshot Match)</div>
+        <div class="sample-pill" onclick="loadSample('sample_student_1247.jpg', this)">Student Sheet (Sensors & PN Junction)</div>
+        <div class="sample-pill" onclick="loadSample('handwritten_exam_sample1.jpg', this)">Math Derivation (Step-Marking)</div>
+        <div class="sample-pill" onclick="loadSample('crossed_out_sample.jpg', this)">Crossed-Out Derivation (Cut Handling)</div>
       </div>
     </div>
 
-    <!-- Right Pane: Tabs & Inspection -->
+    <!-- Right Pane: Results Tabs -->
     <div class="right-pane">
-      <div class="tabs-header">
-        <button class="tab-btn active" id="tabBtn-blocks" onclick="switchTab('blocks')">🔲 Blocks</button>
-        <button class="tab-btn" id="tabBtn-grades" onclick="switchTab('grades')">📝 Grading & Audit</button>
-        <button class="tab-btn" id="tabBtn-markdown" onclick="switchTab('markdown')">📄 Markdown</button>
-        <button class="tab-btn" id="tabBtn-json" onclick="switchTab('json')">{ } JSON</button>
-        <button class="tab-btn" id="tabBtn-api" onclick="switchTab('api')">⚡ API</button>
-        <button class="tab-btn" id="tabBtn-config" onclick="switchTab('config')">⚙️ Rubric</button>
-        <div class="tab-controls-right">
+      <!-- Main Top Tabs -->
+      <div class="main-tabs-bar">
+        <div class="main-tab" onclick="switchMainTab('config')">Configuration</div>
+        <div class="main-tab active" onclick="switchMainTab('results')">Results</div>
+      </div>
+
+      <!-- Sub-Tabs under Results -->
+      <div class="sub-tabs-header">
+        <button class="sub-tab-btn active" onclick="switchSubTab('blocks')">⊙ Blocks</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('grades')">📝 Grading & Audit</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('markdown')">📄 Markdown</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('json')">{ } JSON</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('api')">⚡ API</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('rubric')">⚙️ Rubric</button>
+
+        <div class="sub-tab-controls-right">
           <label class="html-toggle">
-            <input type="checkbox" id="renderHtmlCheck" checked onchange="toggleRenderHtml()">
-            <span>Render HTML</span>
+            <input type="checkbox" id="renderHtmlToggle" checked onchange="toggleRenderHtml(this.checked)">
+            Render HTML
           </label>
-          <div class="score-summary-pill" id="scorePill">Score: -- / --</div>
+          <div class="score-summary-pill" id="scorePill">Score: 14.0 / 15.0</div>
         </div>
       </div>
 
-      <!-- Sub-Tab 1: Blocks (With Visual Diagram Crops & Cuts Handling) -->
-      <div class="tab-content active" id="tab-blocks">
-        <div id="blocksContainer">
-          <div style="text-align:center; padding: 40px; color: var(--text-muted);">
-            Upload a document or click a test sample to segment blocks and view figures.
-          </div>
+      <!-- 1. Blocks Tab (Datalab Exact Match) -->
+      <div class="tab-content active" id="tabBlocks">
+        <div class="blocks-stream" id="blocksContainer">
+          <!-- Dynamically populated -->
         </div>
       </div>
 
-      <!-- Sub-Tab 2: Grading & University Scoring -->
-      <div class="tab-content" id="tab-grades">
-        <div id="gradesContainer">
-          <div style="text-align:center; padding: 40px; color: var(--text-muted);">
-            Evaluation scores and verbatim citations will appear here after grading.
-          </div>
-        </div>
+      <!-- 2. Grading & Audit Tab -->
+      <div class="tab-content" id="tabGrades" style="padding:16px;">
+        <div id="gradesContainer"></div>
       </div>
 
-      <!-- Sub-Tab 3: Markdown View -->
-      <div class="tab-content" id="tab-markdown">
-        <div id="renderedMarkdownView" style="display:block; line-height:1.6; font-size:0.85rem;"></div>
-        <pre class="code-viewer" id="rawMarkdownView" style="display:none;"></pre>
+      <!-- 3. Markdown Tab -->
+      <div class="tab-content" id="tabMarkdown">
+        <div id="rawMarkdownView" class="code-viewer" style="display:none;"></div>
+        <div id="renderedMarkdownView" style="padding:20px; font-size:0.88rem; line-height:1.6;"></div>
       </div>
 
-      <!-- Sub-Tab 4: JSON View -->
-      <div class="tab-content" id="tab-json">
-        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-          <button class="btn-tool" onclick="copyJson()">📋 Copy JSON</button>
-        </div>
-        <pre class="code-viewer" id="jsonViewer">No document processed yet.</pre>
+      <!-- 4. JSON Tab -->
+      <div class="tab-content" id="tabJson">
+        <pre class="code-viewer" id="jsonViewer"></pre>
       </div>
 
-      <!-- Sub-Tab 5: API Code Snippet -->
-      <div class="tab-content" id="tab-api">
-        <div class="config-card">
-          <div class="config-title">cURL (Direct Execution)</div>
-          <pre class="code-viewer" id="curlSnippet"></pre>
-        </div>
-        <div class="config-card">
-          <div class="config-title">Python (requests SDK)</div>
-          <pre class="code-viewer" id="pythonSnippet"></pre>
-        </div>
+      <!-- 5. API Snippets Tab -->
+      <div class="tab-content" id="tabApi" style="padding:16px;">
+        <div style="font-size:0.8rem; margin-bottom:10px; color:var(--text-muted);">Python integration for Inscora & Datalab API:</div>
+        <pre class="code-viewer" id="apiSnippetPython"></pre>
       </div>
 
-      <!-- Sub-Tab 6: Configuration & Rubrics -->
-      <div class="tab-content" id="tab-config">
-        <div class="config-card">
-          <div class="config-title">Official Answer Key & Grading Rubric</div>
-          <div class="form-group">
-            <label>Answer Key / Question Rubric:</label>
-            <textarea id="rubricText">Q1 (5 marks): Non-touch sensors: definition, working principle, electromagnetic induction, sensing range (1-20mm).
-Q2 (5 marks): Full-Wave Bridge Rectifier circuit diagram: transformer, diode bridge (D1-D4), operation during positive half cycle through load resistor RL.
-Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clocking, speed, propagation delay.</textarea>
-          </div>
-          <div class="form-group">
-            <label>Section Option Rules (e.g. Best 2 of 3):</label>
-            <input type="text" id="sectionRulesInput" value='{"Part A": 2}'>
-          </div>
-          <div class="form-group">
-            <label>Evaluation Mode:</label>
-            <select id="rubricModeSelect">
-              <option value="structured">📋 Structured (Question-by-Question: Q1, Q2...)</option>
-              <option value="unstructured">🌐 Unstructured / Holistic (Essay / Topic Matching)</option>
-            </select>
-          </div>
-          <button class="btn-parse" onclick="startGrading()">🚀 Run OCR & Grade Document</button>
+      <!-- 6. Rubric Config Tab -->
+      <div class="tab-content" id="tabRubric" style="padding:16px;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Grading Mode</label>
+          <select id="rubricModeSelect" style="width:100%; margin-top:4px; padding:8px; background:#172033; border:1px solid var(--card-border); color:var(--text); border-radius:4px;">
+            <option value="structured">Structured Mode (Explicit Q1, Q2, Q3 Marks)</option>
+            <option value="unstructured">Unstructured Mode (Loose Syllabus / Criteria)</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Evaluation Rubric</label>
+          <textarea id="rubricText" rows="6" style="width:100%; margin-top:4px; padding:8px; background:#172033; border:1px solid var(--card-border); color:var(--text); border-radius:4px; font-family:'JetBrains Mono'; font-size:0.8rem;">Q1 (5 marks): Full-Wave Rectified waveform signal: input AC sinusoidal wave, positive and negative half cycles converted to positive DC voltage.
+Q2 (5 marks): Bridge rectifier circuit diagram: primary coil, secondary coil, diodes D1-D4, load resistor, and laminating rod.
+Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of efficiency, diode count, and energy loss.</textarea>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Section Option Rules (Optional JSON)</label>
+          <input type="text" id="sectionRulesInput" placeholder='e.g. {"Section A": 5}' style="width:100%; margin-top:4px; padding:8px; background:#172033; border:1px solid var(--card-border); color:var(--text); border-radius:4px; font-family:'JetBrains Mono'; font-size:0.8rem;">
         </div>
       </div>
+    </div>
+  </div>
 
+  <!-- API Modal -->
+  <div class="modal-overlay" id="apiModal" onclick="if(event.target===this)closeApiModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size:1rem;">API Code Snippet</h3>
+        <button class="modal-close" onclick="closeApiModal()">&times;</button>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Integrate directly via REST or Python client:</p>
+      <pre class="code-viewer" id="modalCodeSnippet"></pre>
     </div>
   </div>
 
   <script>
-    let currentResult = null;
+    let currentZoom = 100;
     let selectedFiles = [];
-    let bboxesVisible = true;
-    let zoomLevel = 1.0;
+    let currentResult = null;
 
     // Zoom Controls
-    function changeZoom(delta) {
-      zoomLevel = Math.max(0.4, Math.min(2.5, zoomLevel + delta));
-      document.getElementById('docContainer').style.transform = `scale(${zoomLevel})`;
-      document.getElementById('zoomVal').innerText = `${Math.round(zoomLevel * 100)}%`;
+    function zoom(delta) {
+      currentZoom = Math.min(220, Math.max(50, currentZoom + delta));
+      document.getElementById('zoomVal').innerText = currentZoom + '%';
+      document.getElementById('docWrapper').style.transform = `scale(${currentZoom / 100})`;
     }
     function resetZoom() {
-      zoomLevel = 1.0;
-      document.getElementById('docContainer').style.transform = 'scale(1)';
+      currentZoom = 100;
       document.getElementById('zoomVal').innerText = '100%';
+      document.getElementById('docWrapper').style.transform = 'scale(1)';
     }
 
-    // Tab Switching
-    function switchTab(tabName) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      const btn = document.getElementById('tabBtn-' + tabName);
-      const content = document.getElementById('tab-' + tabName);
-      if (btn) btn.classList.add('active');
-      if (content) content.classList.add('active');
-    }
-
-    // Toggle BBoxes
-    function toggleBboxes() {
-      bboxesVisible = !bboxesVisible;
-      document.getElementById('bboxCheck').checked = bboxesVisible;
+    // Toggle Bboxes
+    function toggleBboxes(e) {
+      if (e.target.tagName !== 'INPUT') {
+        const cb = document.getElementById('bboxToggle');
+        cb.checked = !cb.checked;
+      }
+      const show = document.getElementById('bboxToggle').checked;
       const overlay = document.getElementById('bboxOverlay');
-      if (bboxesVisible) overlay.classList.add('show');
+      if (show) overlay.classList.add('show');
       else overlay.classList.remove('show');
     }
 
-    // Render HTML toggle
-    function toggleRenderHtml() {
-      const isHtml = document.getElementById('renderHtmlCheck').checked;
-      document.getElementById('renderedMarkdownView').style.display = isHtml ? 'block' : 'none';
-      document.getElementById('rawMarkdownView').style.display = isHtml ? 'none' : 'block';
+    // Sub-Tabs
+    function switchSubTab(tabKey) {
+      document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      const btn = Array.from(document.querySelectorAll('.sub-tab-btn')).find(b => b.innerText.toLowerCase().includes(tabKey));
+      if (btn) btn.classList.add('active');
+
+      const targetId = 'tab' + tabKey.charAt(0).toUpperCase() + tabKey.slice(1);
+      const target = document.getElementById(targetId);
+      if (target) target.classList.add('active');
     }
 
-    // Load Sample Image
-    async function loadSample(filename) {
-      document.querySelectorAll('.sample-pill').forEach(p => p.classList.remove('active'));
+    function switchMainTab(tab) {
+      document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
-
-      const url = '/api/samples/' + filename;
-      const img = document.getElementById('docImg');
-      img.src = url;
-
-      // Fetch blob into selectedFiles
-      const res = await fetch(url);
-      const blob = await res.blob();
-      selectedFiles = [new File([blob], filename, { type: filename.endsWith('.png') ? 'image/png' : 'image/jpeg' })];
-
-      // Auto-adapt rubric
-      if (filename.includes('circuit_diagram')) {
-        document.getElementById('rubricText').value = 
-          "Q1 (5 marks): Full-Wave Rectified waveform signal: input AC sinusoidal wave, positive and negative half cycles converted to positive DC voltage.\n" +
-          "Q2 (5 marks): Bridge rectifier circuit diagram: primary coil, secondary coil, diodes D1-D4, load resistor, and laminating rod.\n" +
-          "Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of efficiency, diode count, and energy loss.";
-      }
-      resetZoom();
-      startGrading();
+      if (tab === 'config') switchSubTab('rubric');
+      else switchSubTab('blocks');
     }
 
-    function handleFileSelect(e) {
-      if (e.target.files && e.target.files.length > 0) {
-        selectedFiles = Array.from(e.target.files);
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          document.getElementById('docImg').src = evt.target.result;
-        };
-        reader.readAsDataURL(selectedFiles[0]);
+    function toggleRenderHtml(checked) {
+      document.getElementById('rawMarkdownView').style.display = checked ? 'none' : 'block';
+      document.getElementById('renderedMarkdownView').style.display = checked ? 'block' : 'none';
+    }
+
+    // Load Sample Images
+    function loadSample(filename, pillElem) {
+      document.querySelectorAll('.sample-pill').forEach(p => p.classList.remove('active'));
+      if (pillElem) pillElem.classList.add('active');
+
+      const docImg = document.getElementById('docImg');
+      docImg.src = '/samples/' + filename;
+      selectedFiles = [];
+
+      fetch('/samples/' + filename)
+        .then(r => r.blob())
+        .then(blob => {
+          selectedFiles = [new File([blob], filename, { type: 'image/jpeg' })];
+          startGrading();
+        })
+        .catch(() => {});
+    }
+
+    function handleFileUpload(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      selectedFiles = files;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById('docImg').src = evt.target.result;
         startGrading();
-      }
+      };
+      reader.readAsDataURL(files[0]);
     }
 
     function onImageLoaded() {
@@ -751,10 +809,10 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
         const nw = imgElement.naturalWidth || imgElement.width || 1200;
         const nh = imgElement.naturalHeight || imgElement.height || 1600;
 
-        const ymin = (bbox[0] / 100) * nh;
-        const xmin = (bbox[1] / 100) * nw;
-        const ymax = (bbox[2] / 100) * nh;
-        const xmax = (bbox[3] / 100) * nw;
+        const ymin = Math.max(0, (bbox[0] / 100) * nh);
+        const xmin = Math.max(0, (bbox[1] / 100) * nw);
+        const ymax = Math.min(nh, (bbox[2] / 100) * nh);
+        const xmax = Math.min(nw, (bbox[3] / 100) * nw);
 
         const cw = Math.max(20, xmax - xmin);
         const ch = Math.max(20, ymax - ymin);
@@ -763,15 +821,42 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
         canvas.height = ch;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(imgElement, xmin, ymin, cw, ch, 0, 0, cw, ch);
-        return canvas.toDataURL('image/jpeg', 0.9);
+        return canvas.toDataURL('image/jpeg', 0.92);
       } catch (err) {
         return null;
       }
     }
 
+    // Render structured comparison tables matching Datalab
+    function renderStructuredTableHtml(text) {
+      const lines = text.trim().split('\n').filter(l => l.includes('|'));
+      if (lines.length === 0) return `<div>${escapeHtml(text)}</div>`;
+
+      let html = '<table class="datalab-table">';
+      lines.forEach((line, idx) => {
+        if (line.includes(':---') || line.includes('---:')) return;
+        const cells = line.split('|').map(c => c.trim()).filter((c, i, arr) => i > 0 && i < arr.length - 1);
+        if (cells.length === 0) return;
+
+        html += '<tr>';
+        cells.forEach(cell => {
+          if (idx === 0) html += `<th>${escapeHtml(cell)}</th>`;
+          else html += `<td>${escapeHtml(cell)}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</table>';
+      return html;
+    }
+
     // Start Async Grading
     async function startGrading() {
-      if (selectedFiles.length === 0) return;
+      if (selectedFiles.length === 0) {
+        // Fetch default sample
+        const res = await fetch('/samples/circuit_diagram_sample2.jpg');
+        const blob = await res.blob();
+        selectedFiles = [new File([blob], 'circuit_diagram_sample2.jpg', { type: 'image/jpeg' })];
+      }
 
       const rubric = document.getElementById('rubricText').value;
       const sectionRules = document.getElementById('sectionRulesInput').value;
@@ -784,12 +869,13 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
       formData.append('rubric_mode', rubricMode);
 
       document.getElementById('progressBar').style.display = 'block';
-      document.getElementById('progressFill').style.width = '15%';
+      document.getElementById('progressFill').style.width = '20%';
 
       try {
         const resp = await fetch('/api/grade/async', { method: 'POST', body: formData });
         if (!resp.ok) throw new Error(await resp.text());
         const data = await resp.json();
+        document.getElementById('breadcrumbDocId').innerText = data.job_id.replace('job_', '');
         pollJob(data.job_id);
       } catch (err) {
         alert("Grading error: " + err.message);
@@ -815,10 +901,10 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
             alert("Job failed: " + job.error);
           }
         } catch (e) {}
-      }, 1400);
+      }, 1200);
     }
 
-    // Render Completed Document
+    // Render Completed Results
     function renderResult(res) {
       currentResult = res;
 
@@ -827,7 +913,7 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
       pill.style.display = 'block';
       pill.innerText = `Score: ${res.grading.total_awarded} / ${res.grading.total_max}`;
 
-      // 1. Render Blocks Tab (with figure crops and cut handling)
+      // 1. Render Blocks Tab (with figure crops and table formatting)
       renderBlocksTab(res);
 
       // 2. Render Interactive Bboxes on Canvas
@@ -845,7 +931,7 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
       // 5. Update API Snippets
       updateApiSnippets();
 
-      switchTab('blocks');
+      switchSubTab('blocks');
     }
 
     function renderBlocksTab(res) {
@@ -855,7 +941,7 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
       const docImg = document.getElementById('docImg');
 
       if (blocks.length === 0) {
-        container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No blocks detected.</div>';
+        container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No layout blocks detected.</div>';
         return;
       }
 
@@ -867,15 +953,15 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
         let bodyHtml = '';
         const isFigure = blk.type === 'FIGURE';
         const isCrossedOut = blk.type === 'CROSSED_OUT' || (blk.text && blk.text.includes('~~'));
+        const isTable = blk.type === 'TABLE' || blk.type === 'LISTGROUP' || (blk.text && blk.text.includes('|'));
 
         if (isFigure) {
-          // Crop image from docImg canvas
           const cropUrl = cropFigureBox(docImg, blk.bbox);
           const cropTag = cropUrl ? `<div class="figure-crop-box"><img src="${cropUrl}" class="figure-crop-img" alt="Diagram Crop"></div>` : '';
           bodyHtml = `
             ${cropTag}
             <div class="figure-caption">
-              <strong>Figure / Schematic:</strong> ${blk.text}
+              ${escapeHtml(blk.text)}
             </div>
           `;
         } else if (isCrossedOut) {
@@ -883,24 +969,22 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
           bodyHtml = `
             <div class="struck-content">~~${cleanText}~~</div>
             <div class="cut-alert-banner">
-              ✂️ <strong>Struck-Out Writing:</strong> Ignored & excluded from grading per universal exam directive.
+              ✂️ <strong>Struck-Out Writing:</strong> Ignored & excluded from evaluation per universal exam directive.
             </div>
           `;
+        } else if (isTable) {
+          bodyHtml = renderStructuredTableHtml(blk.text);
         } else {
           bodyHtml = `<div>${escapeHtml(blk.text)}</div>`;
         }
 
         card.innerHTML = `
-          <div class="block-card-header">
-            <span class="block-badge ${blk.type}">${blk.type}</span>
-            <span style="color:var(--text-muted); font-size:0.68rem;">#${idx+1} | Conf: ${Math.round(blk.confidence*100)}%</span>
-          </div>
+          <div class="datalab-block-type ${blk.type}">${blk.type}</div>
           <div class="block-card-body">
             ${bodyHtml}
           </div>
         `;
 
-        // Bidirectional hover highlight
         card.onmouseenter = () => highlightBbox(blk.block_id, true);
         card.onmouseleave = () => highlightBbox(blk.block_id, false);
         container.appendChild(card);
@@ -922,10 +1006,11 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
         rect.style.width = (xmax - xmin) + '%';
         rect.style.height = (ymax - ymin) + '%';
 
-        const label = document.createElement('div');
-        label.className = 'bbox-label';
-        label.innerText = blk.type;
-        rect.appendChild(label);
+        // Floating hover tooltip (never permanently obscures handwriting)
+        const tooltip = document.createElement('div');
+        tooltip.className = 'bbox-tooltip';
+        tooltip.innerText = `${blk.type}`;
+        rect.appendChild(tooltip);
 
         rect.onmouseenter = () => {
           rect.classList.add('highlighted');
@@ -960,121 +1045,70 @@ Q3 (5 marks): Differences between Synchronous and Asynchronous counters: clockin
       const gr = res.grading || {};
       const grades = gr.grades || [];
 
-      // Section Rules Summary
-      if (gr.sections && gr.sections.length > 0) {
-        gr.sections.forEach(s => {
-          const sec = document.createElement('div');
-          sec.style.cssText = "background:#172033; border:1px solid var(--card-border); padding:10px 14px; border-radius:6px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;";
-          sec.innerHTML = `
-            <div>
-              <strong style="color:var(--accent);">${s.section_id}</strong>
-              <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">${s.rule_applied}</span>
-            </div>
-            <div style="font-weight:700; color:var(--green); font-family:'JetBrains Mono';">${s.section_awarded} / ${s.section_max} marks</div>
-          `;
-          container.appendChild(sec);
-        });
-      }
-
       grades.forEach(q => {
         const card = document.createElement('div');
-        card.className = 'q-card' + (q.is_counted ? '' : ' ignored');
+        card.style.cssText = "background:#111726; border:1px solid var(--card-border); padding:16px; border-radius:6px; margin-bottom:12px;";
 
-        const countedBadge = q.is_counted
-          ? `<span class="q-badge badge-counted">Counted</span>`
-          : `<span class="q-badge badge-excess">Excess (Discarded)</span>`;
-        const diagBadge = q.diagram_detected
-          ? `<span class="q-badge badge-diagram">Diagram Credited</span>`
-          : '';
-
-        const cite = q.evidence_quote ? `<div class="evidence-box">"${q.evidence_quote}"</div>` : '';
-
+        const diagBadge = q.diagram_detected ? '<span style="background:var(--purple); color:#fff; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:3px; margin-left:8px;">📐 DIAGRAM DETECTED</span>' : '';
         card.innerHTML = `
-          <div class="q-card-top">
-            <div class="q-id">
-              ${q.question_id}
-              ${countedBadge}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div>
+              <strong style="color:var(--accent); font-size:0.95rem;">${q.question_id}</strong>
               ${diagBadge}
             </div>
-            <div class="q-score">${q.awarded_marks} / ${q.max_marks}</div>
+            <div style="font-family:'JetBrains Mono'; font-weight:700; color:var(--green); font-size:0.95rem;">
+              ${q.awarded_marks} / ${q.max_marks} marks
+            </div>
           </div>
-          ${cite}
-          <div class="feedback-text">${q.feedback || 'No comments.'}</div>
-          <div class="override-row">
-            <span>Teacher Override:</span>
-            <input type="number" step="0.5" class="override-input" id="override-${q.question_id}" value="${q.awarded_marks}">
-            <button class="btn-tool" onclick="applyTeacherOverride('${q.question_id}')">Save</button>
+          <div style="font-size:0.84rem; line-height:1.5; color:#cbd5e1; margin-bottom:8px;">
+            ${escapeHtml(q.feedback)}
           </div>
+          ${q.evidence_quote ? `<div style="background:#090d16; border-left:3px solid var(--accent); padding:8px 12px; font-size:0.78rem; font-family:'JetBrains Mono'; color:#94a3b8;">"${escapeHtml(q.evidence_quote)}"</div>` : ''}
         `;
         container.appendChild(card);
       });
     }
 
-    async function applyTeacherOverride(qid) {
-      if (!currentResult || !currentResult.result_path) return;
-      const fname = currentResult.result_path.split(/[\\/]/).pop();
-      const val = parseFloat(document.getElementById('override-' + qid).value);
-
-      const r = await fetch(`/api/results/${fname}/override`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: qid, new_marks: val, teacher_note: "Manual override" })
-      });
-      const updated = await r.json();
-      renderResult(updated);
-      alert(`Score for ${qid} updated!`);
-    }
-
-    function formatMarkdownHtml(md) {
-      let html = md.replace(/\n/g, '<br>');
-      html = html.replace(/~~(.*?)~~/g, '<span class="struck-content">~~$1~~</span>');
-      return html;
-    }
-
     function updateApiSnippets() {
-      const host = window.location.origin;
-      document.getElementById('curlSnippet').innerText = 
-`curl -X POST "${host}/api/grade/async" \\
-  -F "files=@sheet.jpg" \\
-  -F "rubric=Q1 (5 marks): Define proximity sensor."`;
+      const snippet = `import requests
 
-      document.getElementById('pythonSnippet').innerText = 
-`import requests
-
-url = "${host}/api/grade/async"
-files = [('files', open('sheet.jpg', 'rb'))]
-data = {'rubric': 'Q1 (5 marks): Define proximity sensor.'}
+url = "https://ground-offers-buried-decision.trycloudflare.com/api/grade/async"
+files = [("files", open("exam_sheet.jpg", "rb"))]
+data = {
+    "rubric": "Q1 (5 marks): Rectifier waveform...",
+    "rubric_mode": "structured"
+}
 
 resp = requests.post(url, files=files, data=data)
-print(resp.json())`;
+job_id = resp.json()["job_id"]
+print("Job submitted:", job_id)
+`;
+      document.getElementById('apiSnippetPython').innerText = snippet;
+      document.getElementById('modalCodeSnippet').innerText = snippet;
     }
 
-    function copyJson() {
-      if (!currentResult) return;
-      navigator.clipboard.writeText(JSON.stringify(currentResult, null, 2));
-      alert("JSON copied to clipboard!");
+    function openApiModal() { document.getElementById('apiModal').style.display = 'flex'; }
+    function closeApiModal() { document.getElementById('apiModal').style.display = 'none'; }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function handleEngineChange() {
-      const eng = document.getElementById('engineSelect').value;
-      if (eng === 'chandra') {
-        alert("Switched to Chandra OCR (Datalab Engine). Ready to evaluate.");
-      } else {
-        alert("Switched to GLM-OCR (0.9B Local Engine).");
-      }
-    }
-
-    function prevPage() {}
-    function nextPage() {}
-
-    window.onload = function() {
-      loadSample('circuit_diagram_sample2.png');
-    };
-
-    function escapeHtml(text) {
+    function formatMarkdownHtml(text) {
       if (!text) return '';
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return text.split('\n\n').map(p => `<p style="margin-bottom:12px;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
     }
+
+    function switchEngine(eng) {
+      console.log("Switched engine to:", eng);
+      startGrading();
+    }
+
+    // Auto-initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      startGrading();
+    });
   </script>
 </body>
 </html>
