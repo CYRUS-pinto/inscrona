@@ -32,6 +32,9 @@ scratch/
 **/smoke_sheet.jpg
 !**/uploads/.gitkeep
 !**/results/.gitkeep
+img/*.HEIC
+*.HEIC
+playground_*.png
 
 # Operating system metadata
 Thumbs.db

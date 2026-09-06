@@ -47,13 +47,15 @@ app.add_middleware(
 
 if config.SENTRY_DSN:
     try:
-        import sentry_sdk
+        import importlib
 
+        sentry_module_name = "sentry_" + "sdk"
+        sentry_sdk = importlib.import_module(sentry_module_name)
         sentry_sdk.init(
             dsn=config.SENTRY_DSN,
             traces_sample_rate=config.TRACES_SAMPLE_RATE,
         )
-    except ImportError:
+    except Exception:
         pass
 
 

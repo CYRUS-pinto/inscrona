@@ -8,14 +8,14 @@ Two independent, production-grade editions of the university exam-correction
 pipeline. Run locally or in Google Cloud.
 
 | Edition | OCR engine | Port | Folder |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Chandra edition** | Chandra OCR (Datalab) — local Ollama **or** Datalab hosted API | 8000 | [`chandra-version/`](chandra-version/) |
 | **GLM edition** | GLM-OCR 0.9B — local Ollama, built-in **two-pass** high-accuracy retry | 8001 | [`glm-version/`](glm-version/) |
 
 Each edition is fully self-contained (own venv, config, tests, docs) and runs
 the identical pipeline:
 
-```
+```text
 phone photo → HEIC→JPEG → resize ≤2000px → blur check
            → OCR engine (keep_alive=0, unloaded after)
            → grading LLM llama3.2:3b (JSON-constrained, unloaded after)
