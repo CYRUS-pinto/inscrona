@@ -39,6 +39,14 @@ class QuestionGrade(BaseModel):
     selection_reason: Optional[str] = None
     diagram_detected: bool = False
     teacher_overridden: bool = False
+    keyword_score: Optional[float] = None
+    semantic_score: Optional[float] = None
+    reasoning_score: Optional[float] = None
+    flagged_for_review: bool = False
+    flag_reason: Optional[str] = None
+    matched_keywords: List[str] = []
+    missing_keywords: List[str] = []
+    deductions: List[str] = []
 
 
 class SectionSummary(BaseModel):

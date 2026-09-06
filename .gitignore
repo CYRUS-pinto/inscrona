@@ -25,11 +25,14 @@ scratch/
 **/results/sub_*.json
 **/results/batch_*
 **/results/*.json
+**/results/*.jsonl
+**/results/*.csv
 **/uploads/*.jpg
 **/uploads/*.png
 **/uploads/*.jpeg
 **/uploads/batch_*
 **/smoke_sheet.jpg
+**/samples/*.jpg
 !**/uploads/.gitkeep
 !**/results/.gitkeep
 img/*.HEIC

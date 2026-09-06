@@ -13,12 +13,13 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
+from .audit import append_audit_event, compute_class_analytics, verify_chain_integrity
 from .grader import GraderError, extract_layout_blocks, grade
 from .jobs import job_manager
 from .ocr import OcrError, run_ocr
@@ -148,6 +149,19 @@ def _process_pipeline(
     result_dict["total_elapsed_ms"] = int((time.time() - started) * 1000)
     result_path.write_text(json.dumps(result_dict, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    try:
+        append_audit_event(
+            submission_id=submission_id,
+            total_awarded=result_dict.get("grading", {}).get("total_awarded", 0.0),
+            total_max=result_dict.get("grading", {}).get("total_max", 0.0),
+            action="EVALUATE",
+            actor="SYSTEM_AI",
+            notes=f"Graded via {rubric_mode} mode. Confidence: {result_dict.get('grading', {}).get('overall_confidence')}",
+            log_path=config.RESULTS_DIR / "audit_chain.jsonl",
+        )
+    except Exception:
+        pass
+
     if job_id:
         job_manager.complete_job(job_id, result_dict)
 
@@ -249,34 +263,71 @@ def get_job_status(job_id: str):
 
 
 @app.post("/api/results/{filename}/override")
-def override_question_mark(filename: str, req: OverrideRequest):
-    """Allows a teacher to override awarded marks for a question and recalculates totals."""
+async def override_question_mark(filename: str, request: Request):
+    """Allows a teacher to override awarded marks for one or more questions and recalculates totals with audit trail."""
     safe = Path(filename).name
     path = config.RESULTS_DIR / safe
     if not path.exists():
         raise HTTPException(404, f"Result {safe} not found")
     data = json.loads(path.read_text(encoding="utf-8"))
 
-    grades = data.get("grading", {}).get("grades", [])
-    found = False
-    effective_marks = req.new_marks if req.new_marks is not None else (req.awarded_marks if req.awarded_marks is not None else 0.0)
-    effective_note = req.teacher_note or req.reason or ""
+    try:
+        raw_body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON payload for override")
 
+    items: List[OverrideRequest] = []
+    if isinstance(raw_body, list):
+        for x in raw_body:
+            items.append(OverrideRequest(**x) if isinstance(x, dict) else x)
+    elif isinstance(raw_body, dict):
+        if "overrides" in raw_body and isinstance(raw_body["overrides"], list):
+            for x in raw_body["overrides"]:
+                items.append(OverrideRequest(**x) if isinstance(x, dict) else x)
+        else:
+            items.append(OverrideRequest(**raw_body))
+
+    grades = data.get("grading", {}).get("grades", [])
+    override_map = {o.question_id: o for o in items}
+    matched_count = 0
     for g in grades:
-        if g.get("question_id") == req.question_id:
-            g["awarded_marks"] = effective_marks
+        qid = g.get("question_id")
+        if qid in override_map:
+            ov = override_map[qid]
+            effective_marks = ov.new_marks if ov.new_marks is not None else (ov.awarded_marks if ov.awarded_marks is not None else 0.0)
+            effective_note = ov.teacher_note or ov.reason or ""
+            g["awarded_marks"] = float(effective_marks)
             g["teacher_overridden"] = True
             if effective_note:
                 g["feedback"] = f"[Teacher Override]: {effective_note} | {g.get('feedback', '')}"
-            found = True
-            break
-    if not found:
-        raise HTTPException(404, f"Question {req.question_id} not found in submission")
+            matched_count += 1
 
-    # Recalculate total awarded
+    if not matched_count and items:
+        raise HTTPException(404, f"Question {[o.question_id for o in items]} not found in submission")
+
     counted = [g for g in grades if g.get("is_counted", True)]
     data["grading"]["total_awarded"] = round(sum(g.get("awarded_marks", 0) for g in counted), 2)
+    data["verified"] = True
+    data["verified_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    data["teacher_overridden"] = True
+    data["status"] = "ok"
+    data["total_awarded"] = data["grading"]["total_awarded"]
+    data["overridden_count"] = matched_count
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    try:
+        append_audit_event(
+            submission_id=data.get("submission_id", safe),
+            total_awarded=data["grading"]["total_awarded"],
+            total_max=data.get("grading", {}).get("total_max", 0.0),
+            action="OVERRIDE",
+            actor="TEACHER",
+            notes=f"Teacher overrode {len(override_map)} questions",
+            log_path=config.RESULTS_DIR / "audit_chain.jsonl",
+        )
+    except Exception:
+        pass
+
     return data
 
 
@@ -373,6 +424,20 @@ def verify_submission(filename: str):
     data["verified"] = True
     data["verified_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    try:
+        append_audit_event(
+            submission_id=data.get("submission_id", safe),
+            total_awarded=data.get("grading", {}).get("total_awarded", 0.0),
+            total_max=data.get("grading", {}).get("total_max", 0.0),
+            action="VERIFY",
+            actor="TEACHER",
+            notes="Teacher verified grade",
+            log_path=config.RESULTS_DIR / "audit_chain.jsonl",
+        )
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "submission_id": data.get("submission_id"),
@@ -483,6 +548,89 @@ def download_gradebook_csv(batch_id: str):
     if not path.exists():
         raise HTTPException(404, f"Gradebook for {safe} not found")
     return FileResponse(path, media_type="text/csv", filename=f"{safe}_gradebook.csv")
+
+
+@app.get("/api/audit/verify")
+def audit_verify():
+    """Cryptographically verifies the SHA-256 hash chain of all evaluation and override events."""
+    log_path = config.RESULTS_DIR / "audit_chain.jsonl"
+    is_valid, count, err = verify_chain_integrity(log_path=log_path)
+    return {
+        "status": "ok" if is_valid else "tampered",
+        "is_valid": is_valid,
+        "record_count": count,
+        "error": err,
+    }
+
+
+@app.get("/api/audit/events")
+def audit_events(limit: int = 50):
+    """Returns the immutable audit log entries."""
+    log_path = config.RESULTS_DIR / "audit_chain.jsonl"
+    if not log_path.exists():
+        return {"events": [], "count": 0}
+    lines = log_path.read_text(encoding="utf-8").strip().splitlines()
+    records = []
+    for line in lines[-limit:]:
+        try:
+            records.append(json.loads(line))
+        except Exception:
+            pass
+    return {"events": records, "count": len(lines)}
+
+
+@app.get("/api/analytics")
+def class_analytics():
+    """Calculates class-level psychometrics: mean, median, std dev, pass rate, item difficulty and discrimination."""
+    submissions = []
+    for p in config.RESULTS_DIR.glob("*_grade.json"):
+        try:
+            submissions.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return compute_class_analytics(submissions)
+
+
+@app.get("/api/export/csv")
+def export_master_csv():
+    """Generates and downloads a complete master gradebook CSV with UTF-8 BOM for Excel compatibility."""
+    submissions = []
+    for p in config.RESULTS_DIR.glob("*_grade.json"):
+        try:
+            submissions.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    if not submissions:
+        raise HTTPException(404, "No graded submissions found to export")
+
+    all_q_ids = set()
+    for s in submissions:
+        for g in s.get("grading", {}).get("grades", []):
+            all_q_ids.add(g.get("question_id"))
+    sorted_qs = sorted(list(all_q_ids))
+
+    csv_path = config.RESULTS_DIR / "master_gradebook.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8-sig") as csvfile:
+        fieldnames = ["Submission_ID", "Total_Score", "Max_Score", "Percentage", "Verified"] + sorted_qs + ["Flags"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for s in submissions:
+            gr = s.get("grading", {})
+            tot = gr.get("total_awarded", 0.0)
+            mx = gr.get("total_max", 0.0)
+            row = {
+                "Submission_ID": s.get("submission_id", "unknown"),
+                "Total_Score": tot,
+                "Max_Score": mx,
+                "Percentage": f"{round((tot/mx)*100, 1)}%" if mx > 0 else "0%",
+                "Verified": s.get("verified", False),
+            }
+            for g in gr.get("grades", []):
+                row[g.get("question_id")] = g.get("awarded_marks")
+            row["Flags"] = "; ".join(s.get("flags", []))
+            writer.writerow(row)
+
+    return FileResponse(csv_path, media_type="text/csv", filename="master_gradebook.csv")
 
 
 # Static mounts for uploaded images, samples, and web UI

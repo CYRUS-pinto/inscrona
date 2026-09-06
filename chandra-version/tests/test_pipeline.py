@@ -474,4 +474,93 @@ def test_teacher_verification_and_queue(tmp_path):
         assert disk_data["verified"] is True
 
 
+def test_teacher_override_and_audit_trail(tmp_path):
+    sub_file = tmp_path / "sub_test_override_grade.json"
+    sub_file.write_text(json.dumps({
+        "submission_id": "sub_test_override",
+        "grading": {
+            "total_awarded": 2.0,
+            "total_max": 5.0,
+            "grades": [
+                {"question_id": "Q1", "awarded_marks": 2.0, "max_marks": 5.0, "feedback": "Needs formula", "is_counted": True}
+            ]
+        },
+        "verified": False,
+        "flags": []
+    }), encoding="utf-8")
+
+    with mock.patch.object(config, "RESULTS_DIR", tmp_path):
+        override_payload = [
+            {"question_id": "Q1", "awarded_marks": 4.5, "teacher_note": "Formula was present in margin"}
+        ]
+        r = client.post("/api/results/sub_test_override_grade.json/override", json=override_payload)
+        assert r.status_code == 200
+        res = r.json()
+        assert res["status"] == "ok"
+        assert res["total_awarded"] == 4.5
+        assert res["overridden_count"] == 1
+
+        # Check disk update
+        saved = json.loads(sub_file.read_text(encoding="utf-8"))
+        assert saved["teacher_overridden"] is True
+        assert saved["verified"] is True
+        assert saved["grading"]["total_awarded"] == 4.5
+        assert "Formula was present in margin" in saved["grading"]["grades"][0]["feedback"]
+
+        # Check audit trail verification
+        audit_res = client.get("/api/audit/verify")
+        assert audit_res.status_code == 200
+        adata = audit_res.json()
+        assert adata["status"] == "ok"
+        assert adata["is_valid"] is True
+        assert adata["record_count"] >= 1
+
+        events_res = client.get("/api/audit/events")
+        assert events_res.status_code == 200
+        edata = events_res.json()
+        assert edata["count"] >= 1
+        assert edata["events"][-1]["action"] == "OVERRIDE"
+
+
+def test_class_analytics_and_master_csv_export(tmp_path):
+    sub1 = tmp_path / "sub1_grade.json"
+    sub1.write_text(json.dumps({
+        "submission_id": "sub1",
+        "grading": {
+            "total_awarded": 18.0,
+            "total_max": 20.0,
+            "grades": [{"question_id": "Q1", "awarded_marks": 5.0, "max_marks": 5.0}]
+        },
+        "flags": []
+    }), encoding="utf-8")
+
+    sub2 = tmp_path / "sub2_grade.json"
+    sub2.write_text(json.dumps({
+        "submission_id": "sub2",
+        "grading": {
+            "total_awarded": 14.0,
+            "total_max": 20.0,
+            "grades": [{"question_id": "Q1", "awarded_marks": 3.0, "max_marks": 5.0}]
+        },
+        "flags": ["low confidence"]
+    }), encoding="utf-8")
+
+    with mock.patch.object(config, "RESULTS_DIR", tmp_path):
+        an_res = client.get("/api/analytics")
+        assert an_res.status_code == 200
+        an = an_res.json()
+        assert an["count"] == 2
+        assert an["mean"] == 16.0
+        assert an["pass_rate"] == 100.0
+
+        exp_res = client.get("/api/export/csv")
+        assert exp_res.status_code == 200
+        csv_content = exp_res.text
+        assert "Submission_ID" in csv_content
+        assert "sub1" in csv_content
+        assert "sub2" in csv_content
+        assert "Q1" in csv_content
+
+
+
 

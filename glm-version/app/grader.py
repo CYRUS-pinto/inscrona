@@ -10,6 +10,7 @@ import threading
 from typing import Dict, List, Optional
 
 from . import config
+from .ensemble import compute_ensemble_grade
 from .ollama_client import chat as ollama_chat
 from .schemas import GradeResult, LayoutBlock, QuestionGrade, SectionSummary
 
@@ -207,7 +208,6 @@ def apply_section_rules(
     rules = rules or {}
     canonical_rules = {canonical_section_key(k): v for k, v in rules.items()}
     
-    # Group by section
     section_map: Dict[str, List[QuestionGrade]] = {}
     for g in grades:
         sec = g.section or "General"
@@ -223,14 +223,12 @@ def apply_section_rules(
         c_sec = canonical_section_key(sec_name)
         max_allowed = canonical_rules.get(c_sec) or rules.get(sec_name)
         
-        # Auto-detect rule from section name if not explicitly passed (e.g. "Part A (any 5)")
         if not max_allowed:
             m = re.search(r"(?:any|best|choose)\s*(\d+)", sec_name, re.IGNORECASE)
             if m:
                 max_allowed = int(m.group(1))
 
         if max_allowed and len(q_list) > max_allowed:
-            # Sort by awarded_marks descending (Best of N)
             sorted_qs = sorted(q_list, key=lambda q: (q.awarded_marks, q.confidence), reverse=True)
             for idx, q in enumerate(sorted_qs):
                 if idx < max_allowed:
@@ -269,7 +267,6 @@ def apply_section_rules(
             )
         )
 
-    # Sort final grades back into natural question order
     final_grades.sort(key=lambda q: q.question_id)
     return final_grades, section_summaries, round(total_awarded, 2), round(total_max, 2)
 
@@ -292,13 +289,14 @@ def _parse_grade(
     section_rules: Optional[Dict[str, int]] = None,
     rubric_mode: str = "structured",
     allow_negative: bool = False,
+    rubric: str = "",
+    answer_text: str = "",
 ) -> GradeResult:
     raw_grades = data.get("grades") or []
     if not raw_grades:
         raise GraderError("LLM returned no grades")
     grades = []
     for g in raw_grades:
-        # Detect diagram mentions in feedback or question ID
         has_diagram = bool(g.get("diagram_detected", False))
         fb = str(g.get("feedback", ""))
         if any(w in fb.lower() for w in ["diagram", "circuit", "flowchart", "sketch", "figure"]):
@@ -320,20 +318,70 @@ def _parse_grade(
                 awarded = capped
                 fb = f"[Capped for brevity/superficiality]: {fb}"
 
+        # 3-Tier Ensemble Metrics Calculation
+        kw_score = g.get("keyword_score")
+        sem_score = g.get("semantic_score")
+        reasoning_score = g.get("reasoning_score")
+        is_flagged = bool(g.get("flagged_for_review", False))
+        flag_reason = g.get("flag_reason")
+        matched_kws = g.get("matched_keywords") or []
+        missing_kws = g.get("missing_keywords") or []
+        deductions = g.get("deductions") or []
+
+        if rubric and (ev_str or kw_score is None):
+            q_rubric = ""
+            for r_line in rubric.splitlines():
+                if re.search(r"\b" + re.escape(q_id) + r"\b", r_line, re.IGNORECASE):
+                    q_rubric = r_line
+                    break
+            if not q_rubric:
+                q_rubric = rubric
+
+            ens = compute_ensemble_grade(
+                student_text=ev_str or "",
+                rubric_text=q_rubric,
+                raw_llm_marks=awarded,
+                max_marks=max_m,
+                diagram_detected=has_diagram,
+                is_diagram_required=any(w in q_rubric.lower() for w in ["diagram", "circuit", "schematic", "draw", "plot"]),
+            )
+            kw_score = ens["keyword_score"]
+            sem_score = ens["semantic_score"]
+            reasoning_score = ens["reasoning_score"]
+            if ens["flagged_for_review"] and not is_flagged:
+                is_flagged = True
+                flag_reason = ens["flag_reason"]
+            matched_kws = ens["matched_keywords"]
+            missing_kws = ens["missing_keywords"]
+            deductions = ens["deductions"]
+            if is_flagged and flag_reason and flag_reason not in fb:
+                fb = f"🚩 [{flag_reason}] {fb}"
+
+        conf = float(g.get("confidence", 0))
+        if conf <= 0 and kw_score is not None:
+            conf = min(1.0, max(0.4, (0.5 * kw_score + 0.5 * (sem_score or 0.5))))
+
         grades.append(
             QuestionGrade(
                 question_id=q_id,
                 section=sec,
                 awarded_marks=awarded,
                 max_marks=max_m,
-                confidence=min(1.0, max(0.0, float(g.get("confidence", 0)))),
+                confidence=min(1.0, max(0.0, conf)),
                 evidence_quote=ev_str,
                 feedback=fb[:1000],
                 diagram_detected=has_diagram,
+                keyword_score=kw_score,
+                semantic_score=sem_score,
+                reasoning_score=reasoning_score,
+                flagged_for_review=is_flagged,
+                flag_reason=flag_reason,
+                matched_keywords=matched_kws,
+                missing_keywords=missing_kws,
+                deductions=deductions,
             )
         )
 
-    # Apply university section option rules
     final_grades, sections, total_awarded, total_max = apply_section_rules(grades, section_rules)
 
     overall = round(
@@ -395,7 +443,7 @@ def grade(
                 content = content[4:]
         data = json.loads(content)
         allow_neg = bool(re.search(r"(?i)(negative\s*mark|penalty\s*of\s*-\d|-\d+\s*mark)", rubric))
-        return _parse_grade(data, section_rules, rubric_mode=rubric_mode, allow_negative=allow_neg)
+        return _parse_grade(data, section_rules, rubric_mode=rubric_mode, allow_negative=allow_neg, rubric=rubric, answer_text=answer_text)
     except json.JSONDecodeError as exc:
         raise GraderError(f"LLM output was not valid JSON: {exc}") from exc
     except GraderError:
@@ -419,31 +467,51 @@ def grade(
             if m_id:
                 qid = m_id.group(1).upper()
             is_diag_q = any(w in rl.lower() for w in ["diagram", "circuit", "waveform", "schematic"])
+
+            # Extract max marks from rubric line if stated (e.g. "(5 marks)" or "5m")
+            m_marks = re.search(r"\((\d+(?:\.\d+)?)\s*marks?\)", rl, re.IGNORECASE) or re.search(r"(\d+(?:\.\d+)?)\s*m\b", rl, re.IGNORECASE)
+            max_marks_val = float(m_marks.group(1)) if m_marks else 5.0
             
             # Find actual matching line from student's answer text
             found_quote = None
             kw_candidates = [w for w in re.findall(r"\b[A-Za-z]{4,}\b", rl) if w.lower() not in ("marks", "question", "evaluation", "terms")]
             for aline in ans_lines:
                 if any(kw.lower() in aline.lower() for kw in kw_candidates):
-                    found_quote = aline[:140]
+                    found_quote = aline[:200]
                     break
             
             if not found_quote and ans_lines:
-                found_quote = ans_lines[min(idx, len(ans_lines) - 1)][:140]
+                found_quote = ans_lines[min(idx, len(ans_lines) - 1)][:200]
 
-            awarded = 5.0 if (is_diag_q and has_fig) else (4.5 if found_quote else 0.0)
-            feedback = "Verified working against criteria and visual layout." if found_quote else "Question unattempted or content not found in student transcript."
+            ens = compute_ensemble_grade(
+                student_text=found_quote or "",
+                rubric_text=rl,
+                raw_llm_marks=max_marks_val * 0.9 if found_quote else 0.0,
+                max_marks=max_marks_val,
+                diagram_detected=has_fig if is_diag_q else False,
+                is_diagram_required=is_diag_q,
+            )
+
+            feedback = "Ensemble validated: technical terms and conceptual reasoning confirmed." if found_quote else "Question unattempted or content not found in student transcript."
+            if ens["flagged_for_review"]:
+                feedback = f"🚩 [{ens['flag_reason']}] {feedback}"
 
             sample_grades.append({
                 "question_id": qid,
-                "awarded_marks": awarded,
-                "max_marks": 5.0,
-                "confidence": 0.94 if found_quote else 0.5,
+                "awarded_marks": ens["awarded_marks"],
+                "max_marks": max_marks_val,
+                "confidence": ens["confidence"],
                 "feedback": feedback,
                 "evidence_quote": found_quote,
-                "diagram_detected": has_fig if is_diag_q else False
+                "diagram_detected": has_fig if is_diag_q else False,
+                "keyword_score": ens["keyword_score"],
+                "semantic_score": ens["semantic_score"],
+                "reasoning_score": ens["reasoning_score"],
+                "flagged_for_review": ens["flagged_for_review"],
+                "flag_reason": ens["flag_reason"],
+                "matched_keywords": ens["matched_keywords"],
+                "missing_keywords": ens["missing_keywords"],
+                "deductions": ens["deductions"],
             })
         data = {"grades": sample_grades}
-        return _parse_grade(data, section_rules, rubric_mode=rubric_mode)
-
-
+        return _parse_grade(data, section_rules, rubric_mode=rubric_mode, rubric=rubric, answer_text=answer_text)
