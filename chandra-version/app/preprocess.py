@@ -79,6 +79,12 @@ def prepare(raw: bytes) -> PreparedImage:
     small.thumbnail((400, 400))
     blur = laplacian_variance(small)
 
+    # Dynamic contrast normalization: sharpens faint pencil & normalizes shadow scans
+    try:
+        img = ImageOps.autocontrast(img, cutoff=0.5)
+    except Exception:
+        pass
+
     resized = False
     if max(img.size) > config.MAX_IMAGE_EDGE:
         img.thumbnail((config.MAX_IMAGE_EDGE, config.MAX_IMAGE_EDGE), Image.LANCZOS)

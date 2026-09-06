@@ -306,6 +306,7 @@ def _parse_grade(
     data: dict,
     section_rules: Optional[Dict[str, int]] = None,
     rubric_mode: str = "structured",
+    allow_negative: bool = False,
 ) -> GradeResult:
     raw_grades = data.get("grades") or []
     if not raw_grades:
@@ -322,8 +323,9 @@ def _parse_grade(
         ev = g.get("evidence_quote")
         ev_str = str(ev).strip() if ev else None
 
-        awarded = max(0.0, float(g.get("awarded_marks", 0)))
+        raw_awarded = float(g.get("awarded_marks", 0))
         max_m = max(0.0, float(g.get("max_marks", 0)))
+        awarded = raw_awarded if allow_negative else max(0.0, raw_awarded)
 
         # Safeguard against 1-line empty bluff answers: only cap if evidence is genuinely trivial (<25 chars) and lacks diagram
         if ev_str and len(ev_str.strip()) < 25 and not has_diagram and max_m > 0:
@@ -405,7 +407,8 @@ def grade(
             if content.startswith("json"):
                 content = content[4:]
         data = json.loads(content)
-        return _parse_grade(data, section_rules, rubric_mode=rubric_mode)
+        allow_neg = bool(re.search(r"(?i)(negative\s*mark|penalty\s*of\s*-\d|-\d+\s*mark)", rubric))
+        return _parse_grade(data, section_rules, rubric_mode=rubric_mode, allow_negative=allow_neg)
     except json.JSONDecodeError as exc:
         raise GraderError(f"LLM output was not valid JSON: {exc}") from exc
     except GraderError:
