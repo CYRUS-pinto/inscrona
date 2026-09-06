@@ -445,4 +445,33 @@ def test_grade_batch_and_csv_export(tmp_path):
         assert "student1.jpg" in csv_r.text
 
 
+def test_teacher_verification_and_queue(tmp_path):
+    sub_file = tmp_path / "sub_test_verify_grade.json"
+    sub_file.write_text(json.dumps({
+        "submission_id": "sub_test_verify",
+        "grading": {"total_awarded": 14.0, "total_max": 15.0},
+        "verified": False,
+        "image_urls": ["/uploads/test.jpg"]
+    }), encoding="utf-8")
+
+    with mock.patch.object(config, "RESULTS_DIR", tmp_path):
+        r = client.get("/api/results")
+        assert r.status_code == 200
+        data = r.json()
+        assert "sub_test_verify_grade.json" in data["results"]
+        assert len(data["queue"]) >= 1
+        assert data["queue"][0]["verified"] is False
+        assert data["queue"][0]["total_awarded"] == 14.0
+
+        vr = client.post("/api/results/sub_test_verify_grade.json/verify")
+        assert vr.status_code == 200
+        vdata = vr.json()
+        assert vdata["status"] == "ok"
+        assert vdata["verified"] is True
+        assert "verified_at" in vdata
+
+        disk_data = json.loads(sub_file.read_text(encoding="utf-8"))
+        assert disk_data["verified"] is True
+
+
 

@@ -327,8 +327,25 @@ def get_sample_image(filename: str):
 
 @app.get("/api/results")
 def list_results():
-    names = [p.name for p in config.RESULTS_DIR.glob("sub_*_grade.json")]
-    return {"results": sorted(names, reverse=True)}
+    items = []
+    names = sorted([p.name for p in config.RESULTS_DIR.glob("sub_*_grade.json")], reverse=True)
+    for name in names[:50]:
+        try:
+            p = config.RESULTS_DIR / name
+            data = json.loads(p.read_text(encoding="utf-8"))
+            grading = data.get("grading", {})
+            items.append({
+                "filename": name,
+                "submission_id": data.get("submission_id", name),
+                "total_awarded": grading.get("total_awarded", 0),
+                "total_max": grading.get("total_max", 0),
+                "verified": data.get("verified", False),
+                "verified_at": data.get("verified_at"),
+                "image_urls": data.get("image_urls", []),
+            })
+        except Exception:
+            items.append({"filename": name, "submission_id": name, "verified": False})
+    return {"results": names, "queue": items}
 
 
 @app.get("/api/results/{name}")
@@ -338,6 +355,27 @@ def get_result(name: str):
     if not p.exists():
         raise HTTPException(404, f"Result '{safe}' not found")
     return json.loads(p.read_text(encoding="utf-8"))
+
+
+@app.post("/api/results/{filename}/verify")
+def verify_submission(filename: str):
+    """Allows a teacher to quickly sign off on and verify an AI-graded paper."""
+    safe = Path(filename).name
+    path = config.RESULTS_DIR / safe
+    if not path.exists():
+        raise HTTPException(404, f"Result {safe} not found")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["verified"] = True
+    data["verified_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {
+        "status": "ok",
+        "submission_id": data.get("submission_id"),
+        "verified": True,
+        "verified_at": data["verified_at"],
+        "total_awarded": data.get("grading", {}).get("total_awarded"),
+        "total_max": data.get("grading", {}).get("total_max"),
+    }
 
 
 @app.post("/api/grade/batch")
