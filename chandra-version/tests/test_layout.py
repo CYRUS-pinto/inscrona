@@ -1,13 +1,13 @@
-"""Comprehensive Unit and Integration Tests for Document Layout Analysis & Cut Detection.
-Verifies Datalab-grade bounding box generation, semantic block classification,
-diagram segmentation, strikethrough detection, and confidence scoring.
+"""Comprehensive Unit and Integration Tests for Real-Data Document Layout Analysis & Cut Detection.
+Verifies IBM Docling RT-DETR detection, OpenCV morphology fallback, strikethrough/cut detection,
+confidence scoring, and genuine text mapping with zero synthetic mock data.
 """
 import os
 import pytest
 from app.layout import (
     extract_layout_blocks,
     _detect_cv_regions,
-    _match_benchmark_ground_truth,
+    _detect_docling_regions,
     LAYOUT_COLORS,
 )
 from app.schemas import LayoutBlock
@@ -25,40 +25,42 @@ def _load_sample_bytes(filename: str) -> bytes:
         return f.read()
 
 
-class TestBenchmarkLayoutGroundTruth:
-    """Verifies that calibrated benchmark samples match the verified ground-truth."""
+class TestRealDataLayoutDetection:
+    """Verifies real deep learning and CV layout detection on physical exam sheets."""
 
-    def test_rectifier_circuit_ground_truth(self):
+    def test_docling_or_cv_detection_on_student_sheet(self):
         img_bytes = _load_sample_bytes("circuit_diagram_sample2.jpg")
-        blocks = extract_layout_blocks("Full wave rectifier", page_count=1, jpegs=[img_bytes])
+        blocks = extract_layout_blocks(
+            "During positive half cycle (+ve)\nDuring negative half cycle (-ve)\nIt is a continuous cycle",
+            page_count=1,
+            jpegs=[img_bytes]
+        )
 
-        assert len(blocks) >= 5, "Should return at least 5 benchmark blocks for rectifier sample"
-        
-        # Verify block types
-        types = [b.type for b in blocks]
-        assert "FIGURE" in types, "Should contain at least one FIGURE block"
-        assert "LISTGROUP" in types or "TABLE" in types, "Should contain comparison table"
-        assert "PAGEFOOTER" in types, "Should contain page footer"
-
-        # Check diagram bounding box coordinates
-        fig_blocks = [b for b in blocks if b.type == "FIGURE"]
-        assert len(fig_blocks) >= 2, "Rectifier sheet contains waveform graph and circuit diagram"
+        assert len(blocks) >= 3, f"Should detect at least 3 blocks on student sheet, got {len(blocks)}"
         
         # Verify valid normalized percentage bounds
         for b in blocks:
             ymin, xmin, ymax, xmax = b.bbox
             assert 0.0 <= ymin < ymax <= 100.0, f"Invalid y bounds: {b.bbox}"
             assert 0.0 <= xmin < xmax <= 100.0, f"Invalid x bounds: {b.bbox}"
-            assert 0.80 <= b.confidence <= 1.0, f"Confidence out of range: {b.confidence}"
+            assert 0.70 <= b.confidence <= 1.0, f"Confidence out of range: {b.confidence}"
 
-    def test_img_1279_ground_truth(self):
+        # Verify that actual text is assigned, not synthetic benchmark tables
+        assigned_text = " ".join(b.text for b in blocks)
+        assert "positive half cycle" in assigned_text or "negative half cycle" in assigned_text
+        assert "No Energy loss" not in assigned_text, "Must NOT inject synthetic comparison tables"
+
+    def test_img_1279_real_detection(self):
         img_bytes = _load_sample_bytes("IMG_1279.jpg")
-        blocks = extract_layout_blocks("pn junction diode", page_count=1, jpegs=[img_bytes])
+        blocks = extract_layout_blocks(
+            "Q1. Explain P-N junction diode under forward and reverse bias.\nDepletion region width decreases under forward bias.",
+            page_count=1,
+            jpegs=[img_bytes]
+        )
 
-        assert len(blocks) >= 4, "Should return at least 4 layout blocks for IMG_1279"
+        assert len(blocks) >= 2, f"Should detect at least 2 blocks on IMG_1279, got {len(blocks)}"
         types = [b.type for b in blocks]
-        assert "FIGURE" in types, "Should identify pn junction diagram or graph"
-        assert "PAGEFOOTER" in types or "PAGEHEADER" in types
+        assert "TEXT" in types or "QUESTION" in types or "FIGURE" in types
 
 
 class TestComputerVisionDynamicSegmentation:
