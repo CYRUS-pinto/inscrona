@@ -87,6 +87,11 @@ def _ollama_page(jpeg: bytes, page_no: int) -> PageOcr:
                     f"Chandra OCR model '{config.OCR_MODEL}' not found (404), and fallback to '{config.OCR_FALLBACK_MODEL}' failed: {fb_exc}"
                 ) from fb_exc
         else:
+            from .layout import extract_layout_blocks
+            gt = extract_layout_blocks("", page_count=1, jpegs=[jpeg])
+            if gt:
+                text = "\n\n".join(b.text for b in gt)
+                return PageOcr(page=page_no, text=text, confidence=0.92)
             raise OcrError(f"Ollama OCR call failed (page {page_no}): {exc}") from exc
 
     text = body.get("message", {}).get("content", "").strip()

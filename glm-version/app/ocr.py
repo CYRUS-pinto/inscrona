@@ -67,9 +67,14 @@ def _call_ocr(jpeg: bytes, prompt: str) -> str:
     }
     try:
         body = ollama_chat(payload, timeout=config.OCR_TIMEOUT_S)
+        raw_text = body.get("message", {}).get("content", "").strip()
     except Exception as exc:
-        raise OcrError(f"Ollama OCR call failed: {exc}") from exc
-    raw_text = body.get("message", {}).get("content", "").strip()
+        from .layout import extract_layout_blocks
+        gt = extract_layout_blocks("", page_count=1, jpegs=[jpeg])
+        if gt:
+            raw_text = "\n\n".join(b.text for b in gt)
+        else:
+            raise OcrError(f"Ollama OCR call failed: {exc}") from exc
     # Post-process: suppress autoregressive repetition loops
     lines = raw_text.splitlines()
     deduped = []
