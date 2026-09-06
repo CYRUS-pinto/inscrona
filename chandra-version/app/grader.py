@@ -108,15 +108,16 @@ class GraderError(RuntimeError):
 def sanitize_untrusted_transcript(text: str) -> str:
     """Neutralizes delimiter-breaking and prompt-injection attempts by student handwriting."""
     # 1. Escape all XML / HTML delimiters that could close or mimic quarantine blocks
-    s = re.sub(r"</?[a-zA-Z0-9_\-]+.*?>", "[STUDENT_TAG]", text)
+    s = re.sub(r"</?[a-zA-Z0-9_\-]+.*?>", " ", text)
     # 2. Neutralize markdown heading markers commonly used to mimic system prompts
     s = re.sub(r"^(#+|\={3,}|\-{3,})\s*", "> ", s, flags=re.MULTILINE)
-    # 3. Neutralize fake system authority headers and injection phrases
-    s = re.sub(
-        r"(?i)\b(system\s+instruction|system\s+override|dean\s+notice|ignore\s+all\s+previous|admin\s+override|special\s+grading\s+permission|award\s+\d+/\d+)\b",
-        "[FRAUDULENT_OVERRIDE_REMOVED]",
-        s,
+    # 3. Aggressively strip prompt injection and instruction lines from student text
+    injection_pattern = re.compile(
+        r"(?i)^.*?\b(system\s+(?:instruction|override|notice)|dean\s+notice|ignore\s+all\s+previous|admin\s+override|"
+        r"special\s+grading|disregard\s+all\s+rubrics|you\s+must\s+output|output\s+awarded_marks|full\s+marks\s+for\s+all).*?$",
+        re.MULTILINE,
     )
+    s = injection_pattern.sub("[FRAUDULENT_PROMPT_INJECTION_REMOVED]", s)
     return s
 
 
@@ -362,7 +363,7 @@ def grade(
         ],
         "stream": False,
         "format": "json",
-        "options": {"temperature": 0.1, "num_ctx": 8192},
+        "options": {"temperature": 0.1, "num_ctx": 4096, "num_predict": 1024},
         "keep_alive": 0,  # unload after inference — free VRAM for OCR model
     }
     try:
