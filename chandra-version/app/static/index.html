@@ -794,13 +794,16 @@
       <!-- Sub-Tabs under Results -->
       <div class="sub-tabs-header">
         <button class="sub-tab-btn active" onclick="switchSubTab('blocks')">⊙ Blocks</button>
-        <button class="sub-tab-btn" onclick="switchSubTab('grades')">📝 Grading & Audit</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('grades')">📝 Grading</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('analytics')">📊 Class Analytics</button>
+        <button class="sub-tab-btn" onclick="switchSubTab('audit')">🛡️ Audit Chain</button>
         <button class="sub-tab-btn" onclick="switchSubTab('markdown')">📄 Markdown</button>
         <button class="sub-tab-btn" onclick="switchSubTab('json')">{ } JSON</button>
         <button class="sub-tab-btn" onclick="switchSubTab('api')">⚡ API</button>
         <button class="sub-tab-btn" onclick="switchSubTab('rubric')">⚙️ Rubric</button>
 
         <div class="sub-tab-controls-right">
+          <button class="header-btn" style="padding:2px 8px; font-size:0.72rem; background:#047857; border-color:#10b981; color:#fff;" onclick="window.open('/api/export/csv')">📥 Export CSV</button>
           <label class="html-toggle">
             <input type="checkbox" id="renderHtmlToggle" checked onchange="toggleRenderHtml(this.checked)">
             Render HTML
@@ -816,9 +819,37 @@
         </div>
       </div>
 
-      <!-- 2. Grading & Audit Tab -->
+      <!-- 2. Grading Tab -->
       <div class="tab-content" id="tabGrades" style="padding:16px;">
         <div id="gradesContainer"></div>
+      </div>
+
+      <!-- 2b. Class Analytics Tab -->
+      <div class="tab-content" id="tabAnalytics" style="padding:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <h3 style="margin:0; font-size:1.05rem; color:#f8fafc;">📊 Class-Wide Psychometrics & Performance</h3>
+            <div style="font-size:0.75rem; color:#94a3b8;">Real-time statistical evaluation across all graded submissions</div>
+          </div>
+          <button class="header-btn" onclick="loadClassAnalytics()" style="padding:4px 10px; font-size:0.75rem;">🔄 Refresh</button>
+        </div>
+        <div id="analyticsContent" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:20px;">
+          <!-- Dynamically populated -->
+        </div>
+        <div id="analyticsQuestionTable" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- 2c. Cryptographic Audit Chain Tab -->
+      <div class="tab-content" id="tabAudit" style="padding:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <h3 style="margin:0; font-size:1.05rem; color:#f8fafc;">🛡️ Tamper-Evident SHA-256 Audit Trail</h3>
+            <div style="font-size:0.75rem; color:#94a3b8;">Cryptographically linked Merkle-chain recording every AI grade & teacher override</div>
+          </div>
+          <button class="header-btn" onclick="verifyAuditChain()" style="padding:4px 10px; font-size:0.75rem; background:#0284c7; border-color:#38bdf8; color:#fff;">🔍 Verify Chain</button>
+        </div>
+        <div id="auditStatusBanner" style="margin-bottom:16px;"></div>
+        <div id="auditEventsContainer" style="font-family:'JetBrains Mono', monospace; font-size:0.76rem; max-height:450px; overflow-y:auto; background:#090d16; border:1px solid var(--card-border); border-radius:6px; padding:12px;"></div>
       </div>
 
       <!-- 3. Markdown Tab -->
@@ -1012,6 +1043,9 @@ Q3 (5 marks): Comparison between Full Wave and Half Wave rectifiers in terms of 
       const targetId = 'tab' + tabKey.charAt(0).toUpperCase() + tabKey.slice(1);
       const target = document.getElementById(targetId);
       if (target) target.classList.add('active');
+
+      if (tabKey === 'analytics') loadClassAnalytics();
+      if (tabKey === 'audit') verifyAuditChain();
     }
 
     function switchMainTab(tab) {

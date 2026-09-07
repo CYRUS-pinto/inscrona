@@ -67,3 +67,18 @@ def list_models() -> Tuple[bool, List[str]]:
             return True, [m.get("name", "") for m in r.json().get("models", [])]
     except Exception:
         return False, []
+
+
+def unload_model(model_name: str) -> bool:
+    """Explicitly evict model from VRAM by issuing keep_alive=0 to Ollama.
+    Critical on consumer GPUs (e.g. 8GB VRAM) to prevent OOM when alternating
+    between Vision-OCR models and 7B Grading LLMs."""
+    if not model_name:
+        return False
+    try:
+        base = _validated_base()
+        with _client(5.0) as c:
+            c.post(base + "/api/generate", json={"model": model_name, "keep_alive": 0})
+        return True
+    except Exception:
+        return False

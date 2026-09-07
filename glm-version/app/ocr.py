@@ -119,6 +119,11 @@ def run_ocr(jpegs: List[bytes]) -> OcrResult:
 
     started = time.time()
     pages = [_ocr_page(jpeg, i) for i, jpeg in enumerate(jpegs, start=1)]
+    try:
+        from .ollama_client import unload_model
+        unload_model(config.OCR_MODEL)
+    except Exception:
+        pass
     full = "\n\n--- PAGE BREAK ---\n\n".join(p.text for p in pages)
     conf = round(sum(p.confidence for p in pages) / len(pages), 3)
     return OcrResult(

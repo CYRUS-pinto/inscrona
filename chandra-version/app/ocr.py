@@ -182,6 +182,13 @@ def run_ocr(jpegs: List[bytes]) -> OcrResult:
     else:
         for i, jpeg in enumerate(jpegs, start=1):
             pages.append(_ollama_page(jpeg, i))
+        try:
+            from .ollama_client import unload_model
+            unload_model(config.OCR_MODEL)
+            if config.OCR_FALLBACK_MODEL:
+                unload_model(config.OCR_FALLBACK_MODEL)
+        except Exception:
+            pass
 
     full = "\n\n--- PAGE BREAK ---\n\n".join(p.text for p in pages)
     conf = round(sum(p.confidence for p in pages) / len(pages), 3)
