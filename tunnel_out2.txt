@@ -1,0 +1,9 @@
+Starting Pinggy tunnel to localhost:8000...
+TUNNEL_URLS: ['https://lqnre-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.run.pinggy-free.link', 'https://tbxrl-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.free.pinggy.net']
+SUCCESS
+
+URL: https://lqnre-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.run.pinggy-free.link
+URL: https://tbxrl-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.free.pinggy.net
+
+Keeping tunnel alive for 3 minutes...
+Tunnel closed.

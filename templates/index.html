@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inscrona — AI Grading</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: #0a1530;
+      color: #ffffff;
+      padding: 48px 24px 52px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .hero p  { margin-top: 8px; font-size: 15px; color: #c0c8d8; }
+
+    /* ── Canvas ── */
+    .canvas { max-width: 640px; margin: -28px auto 48px; padding: 0 16px; }
+
+    /* ── Card ── */
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e3df;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      padding: 32px 28px;
+    }
+
+    /* ── Labels & inputs ── */
+    label { display: block; font-size: 14px; font-weight: 600; color: #37352f; margin-bottom: 6px; }
+    input[type="file"],
+    textarea {
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #f6f5f4;
+      border: 1px solid #c8c4be;
+      border-radius: 8px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="file"] {
+      padding: 0;
+      background: none;
+      border: 2px dashed #e5e3df;
+      cursor: pointer;
+      min-height: 44px;
+    }
+    input[type="file"]:hover { border-color: #5645d4; }
+    textarea { min-height: 100px; resize: vertical; font-size: 13px; }
+    input:focus, textarea:focus { border: 2px solid #5645d4; }
+    select { width: 100%; font-family: 'Inter', sans-serif; font-size: 14px; color: #1a1a1a; background: #ffffff; border: 1px solid #c8c4be; border-radius: 8px; padding: 10px 14px; outline: none; transition: border-color 0.15s; min-height: 44px; }
+    select:focus { border: 2px solid #5645d4; }
+
+    .field { margin-bottom: 20px; }
+
+    /* ── File name ── */
+    .file-name { font-size: 13px; color: #555; margin-top: 6px; min-height: 18px; }
+
+    /* ── Button ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 18px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+      background: #5645d4;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      min-height: 44px;
+    }
+    .btn:hover { background: #4534b3; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { background: #e5e3df; color: #bbb8b1; cursor: not-allowed; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: #1a1a1a;
+      background: transparent;
+      border: 1px solid #c8c4be;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      min-height: 44px;
+      text-decoration: none;
+    }
+    .btn-secondary:hover { background: #f6f5f4; border-color: #999; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results ── */
+    #results {
+      display: none;
+      margin-top: 24px;
+    }
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid #e5e3df;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-label { font-size: 14px; color: #37352f; font-weight: 500; }
+    .result-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .badge-green  { background: #d9f3e1; color: #1aae39; }
+    .badge-orange { background: #ffe8d4; color: #793400; }
+    .badge-red    { background: #ffebeb; color: #e03131; }
+
+    /* ── OCR Transcript ── */
+    .ocr-section {
+      margin-top: 20px;
+    }
+    .ocr-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #5d5b54;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+    .ocr-toggle:hover { color: #1a1a1a; }
+    .ocr-toggle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.15s;
+    }
+    .ocr-toggle.open svg { transform: rotate(90deg); }
+    .ocr-box {
+      display: none;
+      margin-top: 10px;
+      background: #f6f5f4;
+      border: 1px solid #e5e3df;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      white-space: pre-wrap;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .feedback-box {
+      margin-top: 16px;
+      background: #f6f5f4;
+      border: 1px solid #e5e3df;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      white-space: pre-wrap;
+    }
+
+    .error-box {
+      display: none;
+      margin-top: 16px;
+      background: #ffebeb;
+      border: 1px solid #e03131;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: #e03131;
+    }
+
+    /* ── Recent Graded Papers ── */
+    .history-section { margin-top: 32px; }
+    .history-title { font-size: 18px; font-weight: 700; color: #37352f; margin-bottom: 16px; }
+    .history-empty { font-size: 14px; color: #999; text-align: center; padding: 24px 0; }
+    .history-list { list-style: none; }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #f6f5f4;
+      border: 1px solid #e5e3df;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .history-item:hover { background: #eeedea; border-color: #c8c4be; }
+    .history-item-left { display: flex; align-items: center; gap: 12px; }
+    .history-item-id { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #5645d4; font-weight: 500; }
+    .history-item-marks { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+    .history-item-date { font-size: 12px; color: #999; }
+
+    /* ── Detail Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      width: 90%;
+      max-width: 560px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 32px 28px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      background: none; border: none; font-size: 20px; color: #999; cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    .modal-close:hover { color: #1a1a1a; }
+    .modal-title { font-size: 16px; font-weight: 700; color: #37352f; margin-bottom: 16px; }
+    .modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e3df; }
+    .modal-row:last-child { border-bottom: none; }
+    .modal-label { font-size: 14px; color: #555; font-weight: 500; }
+    .modal-value { font-size: 14px; color: #1a1a1a; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .modal-feedback {
+      margin-top: 16px;
+      background: #f6f5f4;
+      border: 1px solid #e5e3df;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <h1>Inscrona</h1>
+    <p>AI-powered answer paper grading</p>
+  </div>
+
+  <div class="canvas">
+    <div class="card">
+      <form id="gradeForm">
+        <div class="field">
+          <label for="file">Answer paper image</label>
+          <input type="file" id="file" name="file" accept="image/*" required>
+          <div class="file-name" id="fileName">No file chosen</div>
+        </div>
+
+        <div class="field">
+          <label for="rubric">Rubric / marking scheme</label>
+          <textarea id="rubric" name="rubric" placeholder="e.g. Q1: definition 2 marks, example 2 marks, conclusion 1 mark. Total: 5"></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">
+          <span class="spinner" id="spinner"></span>
+          <span id="btnLabel">Grade paper</span>
+        </button>
+
+        <div class="error-box" id="errorBox"></div>
+      </form>
+
+      <div id="results">
+        <div class="result-row">
+          <span class="result-label">Marks</span>
+          <span class="result-value" id="rMarks"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Confidence</span>
+          <span class="result-value" id="rConf"></span>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Grade</span>
+          <span id="rBadge"></span>
+        </div>
+        <div class="result-row" style="display:block;">
+          <span class="result-label" style="margin-bottom:8px;">Feedback</span>
+          <div class="feedback-box" id="rFeedback"></div>
+        </div>
+        <div class="ocr-section" id="ocrSection" style="display:none;">
+          <button class="ocr-toggle" id="ocrToggle" type="button" onclick="toggleOcr()">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+            <span>Show OCR transcript</span>
+          </button>
+          <div class="ocr-box" id="ocrBox"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Recent Graded Papers -->
+    <div class="history-section" id="historySection">
+      <h2 class="history-title">Recent Graded Papers</h2>
+      <div id="historyList"></div>
+      <a href="/results/export.csv" class="btn-secondary" download style="margin-top: 12px;">Export CSV</a>
+    </div>
+
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <h3 class="modal-title" id="modalTitle"></h3>
+      <div class="modal-row">
+        <span class="modal-label">Marks</span>
+        <span class="modal-value" id="modalMarks"></span>
+      </div>
+      <div class="modal-row">
+        <span class="modal-label">Confidence</span>
+        <span class="modal-value" id="modalConf"></span>
+      </div>
+      <div class="modal-row">
+        <span class="modal-label">Grade</span>
+        <span id="modalBadge"></span>
+      </div>
+      <div class="modal-row">
+        <span class="modal-label">Date</span>
+        <span class="modal-value" id="modalDate"></span>
+      </div>
+      <div class="modal-row">
+        <span class="modal-label">Job ID</span>
+        <span class="modal-value" id="modalJobId"></span>
+      </div>
+      <div style="margin-top:16px;">
+        <span class="modal-label">Feedback</span>
+        <div class="modal-feedback" id="modalFeedback"></div>
+      </div>
+      <div class="ocr-section" id="modalOcrSection" style="display:none;">
+        <button class="ocr-toggle" id="modalOcrToggle" type="button" onclick="toggleModalOcr()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
+          <span>Show OCR transcript</span>
+        </button>
+        <div class="ocr-box" id="modalOcrBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form     = document.getElementById('gradeForm');
+    const file     = document.getElementById('file');
+    const fileName = document.getElementById('fileName');
+    const btn      = document.getElementById('submitBtn');
+    const spinner  = document.getElementById('spinner');
+    const btnLabel = document.getElementById('btnLabel');
+    const errorBox = document.getElementById('errorBox');
+    const results  = document.getElementById('results');
+    const ocrSection = document.getElementById('ocrSection');
+    const ocrToggle  = document.getElementById('ocrToggle');
+    const ocrBox     = document.getElementById('ocrBox');
+
+    file.addEventListener('change', () => {
+      fileName.textContent = file.files.length ? file.files[0].name : 'No file chosen';
+    });
+
+    function toggleOcr() {
+      const isOpen = ocrBox.style.display === 'block';
+      ocrBox.style.display = isOpen ? 'none' : 'block';
+      ocrToggle.classList.toggle('open', !isOpen);
+      ocrToggle.querySelector('span').textContent = isOpen ? 'Show OCR transcript' : 'Hide OCR transcript';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!file.files.length) return;
+
+      errorBox.style.display = 'none';
+      results.style.display  = 'none';
+      spinner.style.display  = 'block';
+      btnLabel.textContent   = 'Grading...';
+      btn.disabled           = true;
+
+      const fd = new FormData();
+      fd.append('file', file.files[0]);
+      fd.append('rubric', document.getElementById('rubric').value);
+
+      try {
+        const res = await fetch('/grade', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `Server error ${res.status}`);
+        }
+        const d = await res.json();
+
+        document.getElementById('rMarks').textContent = d.marks + '/10';
+        document.getElementById('rConf').textContent  = (d.confidence * 100).toFixed(0) + '%';
+        document.getElementById('rFeedback').textContent = d.feedback;
+
+        /* Badge: colour from confidence (0-1), text from marks (0-10) */
+        const badge = document.getElementById('rBadge');
+        let cls, txt;
+        if (d.confidence >= 0.7)      { cls = 'badge-green'; }
+        else if (d.confidence >= 0.4) { cls = 'badge-orange'; }
+        else                           { cls = 'badge-red'; }
+
+        if (d.marks >= 7)      { txt = 'Passed'; }
+        else if (d.marks >= 4) { txt = 'Needs improvement'; }
+        else                   { txt = 'Needs review'; }
+
+        badge.className = 'badge ' + cls;
+        badge.textContent = txt;
+
+        /* OCR transcript */
+        if (d.ocr_text && d.ocr_text.trim()) {
+          ocrBox.textContent = d.ocr_text;
+          ocrSection.style.display = 'block';
+          ocrBox.style.display = 'none';
+          ocrToggle.classList.remove('open');
+          ocrToggle.querySelector('span').textContent = 'Show OCR transcript';
+        } else {
+          ocrSection.style.display = 'none';
+        }
+
+        results.style.display = 'block';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        spinner.style.display  = 'none';
+        btnLabel.textContent   = 'Grade paper';
+        btn.disabled           = false;
+      }
+    });
+    /* ── History ── */
+    async function loadHistory() {
+      try {
+        const res = await fetch('/results');
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = data.results || [];
+        const el = document.getElementById('historyList');
+        if (!list.length) {
+          el.innerHTML = '<div class="history-empty">No graded papers yet</div>';
+          return;
+        }
+        el.innerHTML = '<ul class="history-list">' + list.map(r => {
+          const pct = (r.confidence * 100).toFixed(0);
+          const dt = r.timestamp ? new Date(r.timestamp * 1000).toLocaleDateString() : '';
+          return `<li class="history-item" onclick="showDetail('${r.job_id}')">
+            <div class="history-item-left">
+              <span class="history-item-id">${r.job_id.substring(0, 8)}</span>
+              <span class="history-item-marks">${r.marks}/10</span>
+              <span class="badge ${r.confidence >= 0.7 ? 'badge-green' : r.confidence >= 0.4 ? 'badge-orange' : 'badge-red'}">${pct}%</span>
+            </div>
+            <span class="history-item-date">${dt}</span>
+          </li>`;
+        }).join('') + '</ul>';
+      } catch(e) {}
+    }
+
+    let currentDetail = null;
+    async function showDetail(jobId) {
+      try {
+        const res = await fetch('/results/' + jobId);
+        if (!res.ok) return;
+        currentDetail = await res.json();
+        document.getElementById('modalTitle').textContent = 'Grade Details';
+        document.getElementById('modalJobId').textContent = currentDetail.job_id;
+        document.getElementById('modalMarks').textContent = currentDetail.marks + '/10';
+        const pct = (currentDetail.confidence * 100).toFixed(0);
+        document.getElementById('modalConf').textContent = pct + '%';
+        const badge = document.getElementById('modalBadge');
+        let cls, txt;
+        if (currentDetail.confidence >= 0.7) cls = 'badge-green';
+        else if (currentDetail.confidence >= 0.4) cls = 'badge-orange';
+        else cls = 'badge-red';
+        if (currentDetail.marks >= 7) txt = 'Passed';
+        else if (currentDetail.marks >= 4) txt = 'Needs improvement';
+        else txt = 'Needs review';
+        badge.className = 'badge ' + cls;
+        badge.textContent = txt;
+        document.getElementById('modalDate').textContent = currentDetail.timestamp ? new Date(currentDetail.timestamp * 1000).toLocaleString() : 'N/A';
+        document.getElementById('modalFeedback').textContent = currentDetail.feedback || 'No feedback';
+        if (currentDetail.ocr_text && currentDetail.ocr_text.trim()) {
+          document.getElementById('modalOcrBox').textContent = currentDetail.ocr_text;
+          document.getElementById('modalOcrSection').style.display = 'block';
+          document.getElementById('modalOcrBox').style.display = 'none';
+          document.getElementById('modalOcrToggle').classList.remove('open');
+          document.getElementById('modalOcrToggle').querySelector('span').textContent = 'Show OCR transcript';
+        } else {
+          document.getElementById('modalOcrSection').style.display = 'none';
+        }
+        document.getElementById('modalOverlay').classList.add('open');
+      } catch(e) {}
+    }
+
+    function closeModal(e) {
+      if (e && e.target !== document.getElementById('modalOverlay')) return;
+      document.getElementById('modalOverlay').classList.remove('open');
+    }
+
+    function toggleModalOcr() {
+      const box = document.getElementById('modalOcrBox');
+      const toggle = document.getElementById('modalOcrToggle');
+      const isOpen = box.style.display === 'block';
+      box.style.display = isOpen ? 'none' : 'block';
+      toggle.classList.toggle('open', !isOpen);
+      toggle.querySelector('span').textContent = isOpen ? 'Show OCR transcript' : 'Hide OCR transcript';
+    }
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    /* Load history on page load */
+    loadHistory();
+  </script>
+</body>
+</html>

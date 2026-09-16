@@ -1,0 +1,6 @@
+{
+  "marks": 6,
+  "confidence": 0.8,
+  "feedback": "The answer provides a good overview of the design thinking process, but lacks specific details and examples from the case study. The idea is clear, but could be more developed. The language is simple and easy to understand.",
+  "ocr_text": "Step-3: Idea: In this step we should think of ideas which should be efficient and user friendly. Something simple so that many people can use it.\n\nStep-4: Prototype: This is also a very crucial step: One must build and gather data for a prototype. If the prototype is not working then its of no use.\n\nStep-5: Testing: In this step we have to make sure all the components are working, if it isn't then improvise it. We must do it accordingly until it works.\n\nWe can use digital live tracking system in our campus. ETA will track our phones and will guide you accordingly.\n\nIt is important to discuss these steps in the context of the case study found.\n5|Page"
+}

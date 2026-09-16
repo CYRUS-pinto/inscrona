@@ -1,0 +1,9 @@
+Starting Pinggy tunnel to localhost:8000...
+TUNNEL_URLS: ['https://nmprv-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.free.pinggy.net', 'https://xwiau-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.run.pinggy-free.link']
+SUCCESS
+
+URL: https://nmprv-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.free.pinggy.net
+URL: https://xwiau-2401-4900-8fae-ec46-35c5-9e0f-7e93-867e.run.pinggy-free.link
+
+Keeping tunnel alive for 3 minutes...
+Tunnel closed.

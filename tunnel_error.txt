@@ -1,0 +1,1 @@
+C:\Users\Cyrus\.hermes\hermes-agent\.hermes-runtime\python\generation-1785997583-4044-0741885d\cpython-3.11-windows-x86_64-none\python.exe: can't open file 'C:\\Users\\Cyrus\\Downloads\\New': [Errno 2] No such file or directory

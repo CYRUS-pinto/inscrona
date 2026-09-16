@@ -1,0 +1,23 @@
+INFO:     Started server process [7084]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8002 (Press CTRL+C to quit)
+2026-09-15 23:08:35.958 | INFO     | main:grade:132 - [25cb42eefd4f] Received grading request -- file=test_resized.jpg
+2026-09-15 23:08:35.961 | INFO     | main:grade:139 - [25cb42eefd4f] Saved upload to uploads\25cb42eefd4f.jpg (488875 bytes)
+2026-09-15 23:08:35.972 | INFO     | main:grade:164 - [25cb42eefd4f] Loading glm-ocr for OCR extraction...
+2026-09-15 23:11:08.887 | DEBUG    | main:_ollama_generate:260 -   [glm-ocr] 152.9s, 1320 chars
+2026-09-15 23:11:08.892 | INFO     | main:grade:173 - [25cb42eefd4f] OCR completed (1320 chars)
+2026-09-15 23:11:08.892 | INFO     | main:grade:176 - [25cb42eefd4f] Loading llama3.2:3b for grading...
+2026-09-15 23:11:40.481 | DEBUG    | main:_ollama_generate:260 -   [llama3.2:3b] 31.6s, 271 chars
+2026-09-15 23:11:40.483 | INFO     | main:grade:185 - [25cb42eefd4f] Grading completed (271 chars)
+2026-09-15 23:11:40.501 | INFO     | main:grade:219 - [25cb42eefd4f] Saved grade to results\25cb42eefd4f_grade.json
+2026-09-15 23:13:12.540 | INFO     | main:grade:132 - [5b0d465ad13b] Received grading request -- file=IMG_1226.jpg
+2026-09-15 23:13:12.541 | INFO     | main:grade:139 - [5b0d465ad13b] Saved upload to uploads\5b0d465ad13b.jpg (478186 bytes)
+2026-09-15 23:13:12.554 | INFO     | main:grade:164 - [5b0d465ad13b] Loading glm-ocr for OCR extraction...
+2026-09-15 23:15:39.846 | DEBUG    | main:_ollama_generate:260 -   [glm-ocr] 147.3s, 1016 chars
+2026-09-15 23:15:39.847 | INFO     | main:grade:173 - [5b0d465ad13b] OCR completed (1016 chars)
+2026-09-15 23:15:39.847 | INFO     | main:grade:176 - [5b0d465ad13b] Loading llama3.2:3b for grading...
+2026-09-15 23:16:19.089 | DEBUG    | main:_ollama_generate:260 -   [llama3.2:3b] 39.2s, 575 chars
+2026-09-15 23:16:19.093 | INFO     | main:grade:185 - [5b0d465ad13b] Grading completed (575 chars)
+2026-09-15 23:16:19.094 | INFO     | main:grade:200 - [5b0d465ad13b] Marks dict flattened to avg: 0
+2026-09-15 23:16:19.104 | INFO     | main:grade:219 - [5b0d465ad13b] Saved grade to results\5b0d465ad13b_grade.json
