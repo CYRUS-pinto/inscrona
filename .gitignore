@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+debug_*.log
+
+# Database
+database.db
+database.db-shm
+database.db-wal
+
+# Results and uploads (keep structure, ignore contents)
+results/*_grade.json
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
+uploads/*.heic
+uploads/*.HEIC
+
+# Tunnel
+tunnel_url.txt
+pinggy_*.txt
+tunnel_*.txt
+tunnel_*.py
+
+# Build artifacts
+*.exe
+*.msi
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/*.apk
+mobile/*.ipa
+
+# Large files
+Buzz_0.5.22_x64-setup_alpha-unsigned.exe
+ZCode-3.11.2-win-x64.exe
+
+# Test images
+test_ocr.jpg
+test_resized.jpg
+IMG_1226.jpg
+IMG_1227.jpg
+
+# IDE cache
+*.pyc
