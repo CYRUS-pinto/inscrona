@@ -7,34 +7,37 @@ import os
 import time
 import uuid
 import secrets
+import hashlib
+import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, Optional, List, Any
+from functools import lru_cache
+from contextlib import asynccontextmanager
 
 import pillow_heif
 import requests
+import httpx
 import sentry_sdk
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Depends, Header
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from pydantic.types import PositiveInt
 
 # ---------------------------------------------------------------------------
 # Sentry initialization
 # ---------------------------------------------------------------------------
-SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-if SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        send_default_pii=True,
-        traces_sample_rate=0.1,
-        profiles_sample_rate=0.1,
-        environment=os.getenv("ENVIRONMENT", "development"),
-    )
-    logger.info("Sentry initialized")
-else:
-    logger.warning("SENTRY_DSN not set — Sentry disabled")
+SENTRY_DSN = "https://fb59bcf7c053c5dc895b6e61de94a571@o4511881652076544.ingest.de.sentry.io/4512032347717712"
+sentry_sdk.init(
+    dsn=SENTRY_DSN,
+    send_default_pii=True,
+    traces_sample_rate=0.1,
+    profiles_sample_rate=0.1,
+    environment=os.getenv("ENVIRONMENT", "development"),
+)
+logger.info("Sentry initialized")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -84,14 +87,82 @@ async def ws_auth(websocket: WebSocket, token: str) -> str:
     return token
 
 # ---------------------------------------------------------------------------
-# Pydantic schema for grading output
+# Pydantic schemas with validation
 # ---------------------------------------------------------------------------
 
+class RubricCriteria(BaseModel):
+    """Individual grading criterion."""
+    name: str = Field(..., min_length=1, max_length=100)
+    weight: float = Field(..., ge=0.0, le=1.0)
+    description: str = Field(default="", max_length=500)
+    max_marks: PositiveInt = Field(default=10)
+
+class GradingRubric(BaseModel):
+    """Structured grading rubric."""
+    criteria: List[RubricCriteria] = Field(default_factory=list)
+    overall_instruction: str = Field(
+        default="Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity.",
+        max_length=2000
+    )
+    pass_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
+    
+    @field_validator('criteria')
+    @classmethod
+    def validate_weights(cls, v):
+        if v:
+            total = sum(c.weight for c in v)
+            if abs(total - 1.0) > 0.01:
+                raise ValueError(f"Criteria weights must sum to 1.0, got {total}")
+        return v
+
+class QuestionGrade(BaseModel):
+    """Grade for a single question."""
+    question_id: str = Field(..., min_length=1)
+    question_text: str = Field(default="", max_length=2000)
+    marks_awarded: float = Field(..., ge=0)
+    max_marks: float = Field(..., gt=0)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    feedback: str = Field(default="", max_length=1000)
+    criterion_scores: Dict[str, float] = Field(default_factory=dict)
+
 class GradeResult(BaseModel):
-    marks: int
-    confidence: float
-    feedback: str
-    ocr_text: str
+    """Complete grading result."""
+    job_id: str = Field(..., min_length=1)
+    total_marks: float = Field(..., ge=0)
+    max_total_marks: float = Field(..., gt=0)
+    percentage: float = Field(..., ge=0.0, le=100.0)
+    overall_confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence_level: str = Field(..., pattern="^(high|medium|low)$")
+    feedback: str = Field(default="", max_length=2000)
+    question_grades: List[QuestionGrade] = Field(default_factory=list)
+    ocr_text: str = Field(default="", max_length=50000)
+    processing_time_ms: int = Field(default=0, ge=0)
+    model_used: str = Field(default="", max_length=50)
+    fallback_used: bool = Field(default=False)
+    flags: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    @property
+    def is_pass(self) -> bool:
+        return self.percentage >= 40.0
+    
+    @property
+    def letter_grade(self) -> str:
+        p = self.percentage
+        if p >= 90: return "A+"
+        elif p >= 80: return "A"
+        elif p >= 70: return "B+"
+        elif p >= 60: return "B"
+        elif p >= 50: return "C"
+        elif p >= 40: return "D"
+        else: return "F"
+
+class GradeRequest(BaseModel):
+    """Request model for grading."""
+    rubric: str = Field(default="Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity.", max_length=2000)
+    structured_rubric: Optional[GradingRubric] = None
+    return_ocr: bool = Field(default=True)
+    return_question_breakdown: bool = Field(default=False)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -103,6 +174,13 @@ app = FastAPI(title="Inscrona", version="0.1.0")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/sentry-debug")
+async def sentry_debug():
+    """Trigger a test error to verify Sentry integration."""
+    division_by_zero = 1 / 0
+    return {"status": "this will never be reached"}
 
 
 @app.get("/")
@@ -176,17 +254,92 @@ def get_result(job_id: str):
     return data
 
 
+# ---------------------------------------------------------------------------
+# Improved OCR and Grading Prompts
+# ---------------------------------------------------------------------------
+
+OCR_PROMPT = """You are an expert OCR system for educational answer sheets. Extract ALL text from this handwritten answer sheet image with maximum accuracy.
+
+Guidelines:
+1. Preserve the exact structure: question numbers, parts (a, b, c), sub-parts
+2. Include ALL text: questions, answers, diagrams descriptions, crossed-out text (mark as [crossed out: ...])
+3. Preserve mathematical notation, formulas, and symbols exactly
+4. Keep paragraph breaks and line structure
+5. Note any diagrams, tables, or graphs: [DIAGRAM: description] or [TABLE: data]
+6. For illegible text, mark as [ILLEGIBLE] - do not guess
+7. Preserve original spelling/grammar errors - do not correct
+8. Include page numbers, question numbers, student details if visible
+
+Output format: Plain text preserving all layout and structure."""
+
+GRADING_PROMPT_TEMPLATE = """You are an expert academic grader evaluating student answers. Be fair, consistent, and thorough.
+
+STUDENT ANSWER:
+{ocr_text}
+
+RUBRIC / INSTRUCTIONS:
+{rubric}
+
+GRADING REQUIREMENTS:
+1. Analyze EACH question/part separately
+2. Award marks based on: correctness, completeness, clarity, depth
+3. For partial credit: explain what's correct vs missing/incorrect
+4. Consider: key concepts, terminology, reasoning, examples, diagrams
+5. Be specific in feedback - reference exact parts of student's answer
+6. Confidence: How certain are you (0.0-1.0) based on OCR clarity and answer quality
+
+OUTPUT ONLY VALID JSON in this exact format:
+{{
+    "total_marks": <float>,
+    "max_total_marks": <float>,
+    "percentage": <float>,
+    "overall_confidence": <0.0-1.0>,
+    "confidence_level": "<high|medium|low>",
+    "feedback": "<detailed overall assessment>",
+    "question_grades": [
+        {{
+            "question_id": "Q1",
+            "question_text": "<brief question summary>",
+            "marks_awarded": <float>,
+            "max_marks": <float>,
+            "confidence": <0.0-1.0>,
+            "feedback": "<specific feedback for this question>",
+            "criterion_scores": {{}}
+        }}
+    ],
+    "flags": ["<any issues: ocr_uncertain, incomplete_answer, diagram_missing, etc>"],
+    "model_used": "llama3.2:3b",
+    "fallback_used": false
+}}"""
+
+# ---------------------------------------------------------------------------
+# Core Grading Endpoint
+# ---------------------------------------------------------------------------
+
 @app.post("/grade", response_model=GradeResult)
 async def grade(
     file: UploadFile = File(...),
     rubric: str = Form(default="Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity."),
+    structured_rubric: Optional[str] = Form(default=None),
+    return_ocr: bool = Form(default=True),
+    return_question_breakdown: bool = Form(default=True),
 ):
+    """Grade a student answer sheet image."""
     job_id = uuid.uuid4().hex[:12]
+    start_time = time.perf_counter()
+    fallback_used = False
+    
     logger.info(f"[{job_id}] Received grading request -- file={file.filename}")
 
     # -- 1. Save uploaded image --
     raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Empty file uploaded")
+    
     ext = Path(file.filename or "upload.jpg").suffix.lower()
+    if ext not in {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'}:
+        raise HTTPException(status_code=400, detail=f"Unsupported file format: {ext}")
+    
     saved_path = UPLOAD_DIR / f"{job_id}{ext}"
     saved_path.write_bytes(raw_bytes)
     logger.info(f"[{job_id}] Saved upload to {saved_path} ({len(raw_bytes)} bytes)")
@@ -194,84 +347,111 @@ async def grade(
     # -- 2. Convert HEIC to JPEG and resize --
     try:
         img = Image.open(saved_path)
+        img.verify()  # Verify it's a valid image
+        img = Image.open(saved_path)  # Reopen after verify
+        
         if ext in (".heic", ".heif"):
             jpeg_path = UPLOAD_DIR / f"{job_id}.jpg"
-            img.save(jpeg_path, "JPEG", quality=90)
-            saved_path.unlink()  # remove HEIC
+            img.save(jpeg_path, "JPEG", quality=90, optimize=True)
+            saved_path.unlink()
             saved_path = jpeg_path
             logger.info(f"[{job_id}] Converted HEIC to JPEG: {saved_path}")
     except Exception as e:
         logger.error(f"[{job_id}] Failed to open image: {e}")
         raise HTTPException(status_code=400, detail=f"Cannot open image: {e}")
 
-    # Resize if too large
+    # Resize if too large (GLM-OCR crashes >2300px)
     w, h = img.size
     if max(w, h) > MAX_LONGEST_EDGE:
         scale = MAX_LONGEST_EDGE / max(w, h)
         new_size = (int(w * scale), int(h * scale))
         img = img.resize(new_size, Image.LANCZOS)
-        img.save(saved_path, "JPEG", quality=90)
+        img.save(saved_path, "JPEG", quality=90, optimize=True)
         logger.info(f"[{job_id}] Resized {w}x{h} -> {new_size[0]}x{new_size[1]}")
 
-    # -- 3. OCR with glm-ocr --
-    logger.info(f"[{job_id}] Loading glm-ocr for OCR extraction...")
+    # -- 3. Convert to base64 --
     with open(saved_path, "rb") as f:
         image_b64 = base64.b64encode(f.read()).decode()
 
-    ocr_prompt = (
-        "Extract all text from this answer booklet image. "
-        "Output only the text content, preserving layout as much as possible."
-    )
-    ocr_text = _ollama_generate("glm-ocr", ocr_prompt, images=[image_b64], keep_alive=0)
-    logger.info(f"[{job_id}] OCR completed ({len(ocr_text)} chars)")
-
-    # -- 4. Grade with llama3.2:3b --
-    logger.info(f"[{job_id}] Loading llama3.2:3b for grading...")
-    grade_prompt = (
-        f"You are an exam grading assistant. Grade the following student answer.\n\n"
-        f"Student Answer:\n{ocr_text}\n\n"
-        f"Rubric: {rubric}\n\n"
-        f"Respond ONLY with valid JSON in this exact format:\n"
-        f'{{"marks": <0-10>, "confidence": <0.0-1.0>, "feedback": "<brief assessment>"}}'
-    )
-    grade_raw = _ollama_generate("llama3.2:3b", grade_prompt, keep_alive=0, format_json=True)
-    logger.info(f"[{job_id}] Grading completed ({len(grade_raw)} chars)")
-
-    # -- 5. Parse JSON --
+    # -- 4. Run inference with fallback --
     try:
-        cleaned = grade_raw.strip()
-        if cleaned.startswith("```"):
-            lines = [l for l in cleaned.split("\n") if not l.startswith("```")]
-            cleaned = "\n".join(lines)
-        parsed = json.loads(cleaned)
-
-        # Handle marks as dict (per-question breakdown) -> extract average
-        marks_raw = parsed.get("marks", 0)
-        if isinstance(marks_raw, dict):
-            values = [v for v in marks_raw.values() if isinstance(v, (int, float))]
-            parsed["marks"] = round(sum(values) / len(values)) if values else 0
-            logger.info(f"[{job_id}] Marks dict flattened to avg: {parsed['marks']}")
-        elif isinstance(marks_raw, str):
-            parsed["marks"] = int(marks_raw)
-
-        # Handle confidence as percentage string like "80%"
-        conf_raw = parsed.get("confidence", 0.5)
-        if isinstance(conf_raw, str):
-            conf_raw = conf_raw.replace("%", "").strip()
-            parsed["confidence"] = float(conf_raw) / 100.0 if float(conf_raw) > 1 else float(conf_raw)
-
-        parsed["ocr_text"] = ocr_text
-        result = GradeResult(**parsed)
+        result = await _grade_with_fallback(
+            image_b64=image_b64,
+            rubric=rubric,
+            job_id=job_id,
+            return_question_breakdown=return_question_breakdown,
+        )
+        fallback_used = result.get("fallback_used", False)
     except Exception as e:
-        logger.error(f"[{job_id}] JSON parse failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Grading model returned invalid JSON: {e}")
+        logger.error(f"[{job_id}] All inference failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # -- 5. Build final result with timing --
+    processing_time_ms = int((time.perf_counter() - start_time) * 1000)
+    
+    # Parse structured rubric if provided
+    structured_rubric_obj = None
+    if structured_rubric:
+        try:
+            structured_rubric_obj = GradingRubric.model_validate_json(structured_rubric)
+            # Merge with rubric text
+            rubric = f"{rubric}\n\nStructured Criteria:\n" + "\n".join(
+                f"- {c.name} (weight: {c.weight}): {c.description}" 
+                for c in structured_rubric_obj.criteria
+            )
+        except Exception as e:
+            logger.warning(f"[{job_id}] Invalid structured_rubric: {e}")
+
+    # Build final result
+    result_data = {
+        "job_id": job_id,
+        "total_marks": result.get("total_marks", 0),
+        "max_total_marks": result.get("max_total_marks", 10),
+        "percentage": result.get("percentage", 0),
+        "overall_confidence": result.get("overall_confidence", 0.5),
+        "confidence_level": result.get("confidence_level", "medium"),
+        "feedback": result.get("feedback", ""),
+        "question_grades": result.get("question_grades", []),
+        "ocr_text": result.get("ocr_text", "") if return_ocr else "",
+        "processing_time_ms": processing_time_ms,
+        "model_used": result.get("model_used", "unknown"),
+        "fallback_used": fallback_used,
+        "flags": result.get("flags", []),
+    }
+
+    # Add flags for quality issues
+    flags = result_data["flags"]
+    if result.get("overall_confidence", 1.0) < 0.5:
+        flags.append("low_confidence")
+    if len(result.get("ocr_text", "")) < 50:
+        flags.append("minimal_ocr_text")
+    if not result.get("question_grades"):
+        flags.append("no_question_breakdown")
+
+    result_data["flags"] = flags
+
+    # Validate and create result
+    try:
+        final_result = GradeResult(**result_data)
+    except Exception as e:
+        logger.error(f"[{job_id}] Result validation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Result validation failed: {e}")
 
     # -- 6. Save result --
     result_path = RESULT_DIR / f"{job_id}_grade.json"
-    result_path.write_text(json.dumps(result.model_dump(), indent=2), encoding="utf-8")
-    logger.info(f"[{job_id}] Saved grade to {result_path}")
+    result_dict = final_result.model_dump()
+    result_path.write_text(json.dumps(result_dict, indent=2, default=str), encoding="utf-8")
+    logger.info(f"[{job_id}] Saved grade to {result_path} (processed in {processing_time_ms}ms)")
 
-    return result
+    # Broadcast completion
+    _broadcast_progress(job_id, {
+        "stage": "completed",
+        "progress": 100,
+        "message": "Complete!",
+        "result": result_dict,
+    })
+
+    return final_result
 
 
 # ---------------------------------------------------------------------------
@@ -541,10 +721,11 @@ async def _grade_with_fallback(
     image_b64: str,
     rubric: str,
     job_id: str,
+    return_question_breakdown: bool = True,
 ) -> dict:
     """
     Try local Ollama first, fallback to Colab on failure.
-    Returns parsed result dict with marks, confidence, feedback, ocr_text.
+    Returns parsed result dict with structured grading output.
     """
     # Try local first
     try:
@@ -552,44 +733,30 @@ async def _grade_with_fallback(
         
         # OCR
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Local OCR (GLM-OCR)..."})
-        ocr_text = _ollama_generate("glm-ocr", 
-            "Extract all text from this answer booklet image. Output only the text content, preserving layout.",
-            images=[image_b64], keep_alive=0)
+        ocr_text = _ollama_generate("glm-ocr", OCR_PROMPT, images=[image_b64], keep_alive=0)
         
         _broadcast_progress(job_id, {"stage": "grading", "progress": 50, "message": "Local grading (Llama 3.2)..."})
-        grade_prompt = (
-            f"You are an exam grading assistant. Grade the following student answer.\n\n"
-            f"Student Answer:\n{ocr_text}\n\n"
-            f"Rubric: {rubric}\n\n"
-            f"Respond ONLY with valid JSON:\n"
-            f'{{"marks": <0-10>, "confidence": <0.0-1.0>, "feedback": "<brief assessment>"}}'
-        )
+        grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
         grade_raw = _ollama_generate("llama3.2:3b", grade_prompt, keep_alive=0, format_json=True)
         
-        # Parse
+        # Parse structured response
         cleaned = grade_raw.strip()
         if cleaned.startswith("```"):
             cleaned = "\n".join([l for l in cleaned.split("\n") if not l.startswith("```")])
         parsed = json.loads(cleaned)
         
-        marks = parsed.get("marks", 0)
-        if isinstance(marks, dict):
-            vals = [v for v in marks.values() if isinstance(v, (int, float))]
-            marks = round(sum(vals)/len(vals)) if vals else 0
-        elif isinstance(marks, str):
-            marks = int(marks)
-        
-        conf = parsed.get("confidence", 0.5)
-        if isinstance(conf, str):
-            conf = conf.replace("%", "").strip()
-            conf = float(conf)/100.0 if float(conf) > 1 else float(conf)
+        # Validate required fields
+        required = ["total_marks", "max_total_marks", "percentage", "overall_confidence", "confidence_level", "feedback"]
+        for field in required:
+            if field not in parsed:
+                raise ValueError(f"Missing required field: {field}")
         
         logger.info(f"[{job_id}] Local inference succeeded")
         return {
-            "marks": marks,
-            "confidence": conf,
-            "feedback": parsed.get("feedback", ""),
-            "ocr_text": ocr_text
+            **parsed,
+            "ocr_text": ocr_text,
+            "model_used": "glm-ocr + llama3.2:3b (local)",
+            "fallback_used": False,
         }
         
     except Exception as e:
@@ -605,6 +772,10 @@ async def _grade_with_fallback(
         try:
             result = await _colab_grade_endpoint(image_b64, rubric)
             logger.info(f"[{job_id}] Colab fallback succeeded")
+            # Ensure Colab result has required fields
+            result.setdefault("model_used", "colab_fallback")
+            result.setdefault("fallback_used", True)
+            result.setdefault("ocr_text", "")
             return result
         except Exception as colab_e:
             logger.error(f"[{job_id}] Colab fallback also failed: {colab_e}")
