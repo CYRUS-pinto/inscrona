@@ -737,3 +737,28 @@ SUCCESS: The process with PID 6584 has been terminated.
 - **GET /**: Returns HTTP 200, serves HTML upload UI.
 - **Background processes killed**: All python processes terminated, port 8000 freed.
 - **README.md**: Exists at project root with prerequisites, quick start, Pinggy remote access, features, API endpoints, and project structure documentation.
+
+## Session 2026-09-17: Results-format fix, GitHub push, free tunnel (no ngrok)
+
+### Fixed: /results and /results/export.csv returned marks=0, confidence=0
+- Root cause: endpoints still read old keys `marks`/`confidence`, but GradeResult stores `total_marks`/`overall_confidence` -> `.get()` defaulted to 0.
+- Fix in main.py `list_results()`: maps `total_marks`->`marks`, `overall_confidence`->`confidence` (with fallback to old keys for legacy files), plus exposes new fields.
+- Fix in `export_csv()`: same key mapping.
+- Fix in `grade()`: `percentage` was copied verbatim from LLM output (model returned 0.0 for a 20/20). Now computed server-side: `round(100*total/max, 1)`.
+- Verified: `/results` shows latest job `cfd64ef5acbb` with marks=20.0, confidence=0.8. Committed as `e3c976d`, pushed to `origin master` (github.com/CYRUS-pinto/inscrona).
+
+### Full pipeline verified live
+- `test_pipeline.py` grade pass: OCR (glm-ocr, ~231s) + grading (llama3.2:3b, ~24s) = ~255s end-to-end, saved `results/cfd64ef5acbb_grade.json` with per-question breakdown.
+- `/sentry-debug` returns 500 by design (triggers 1/0) -> check Sentry dashboard for the captured error.
+
+### Free tunnel WITHOUT ngrok (Pinggy DNS failed, cloudflared Win binary incompatible, cloudflared Linux segfaults in this WSL2, localhost.run needs SSH key)
+- Working solution: **localtunnel via npx** (no account, free): `npx -y localtunnel --port 8000`
+- Public URL: `https://sharp-wombats-turn.loca.lt` (rotates on restart; re-run command for a fresh URL)
+- Verified public: `/health` -> `{"status":"ok"}`, `/results` -> 23 results, latest marks=20.0/confidence=0.8.
+- Server rebound from 127.0.0.1 to 0.0.0.0 so WSL/LAN can reach it. Same-WiFi phone access: `http://10.70.4.90:8000` (no tunnel needed on LAN).
+- Mobile app needs no code change: backend URL comes from QR pairing (`/api/pair`).
+
+### Still open
+- Sentry dashboard check: confirm `ZeroDivisionError` from `/sentry-debug` at cyrus-sh.sentry.io.
+- Mobile build: `cd mobile && npx expo install` then `eas build` (needs Expo login).
+- Tunnel URL rotates: for a stable URL use Tailscale (already installed) `tailscale serve`/`funnel`, or a localtunnel subdomain.
