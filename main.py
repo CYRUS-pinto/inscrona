@@ -26,6 +26,32 @@ from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 from pydantic.types import PositiveInt
 
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Minimal .env loader (stdlib only — no new dependencies per CONSTRAINTS.md).
+
+    Parses KEY=VALUE lines, ignores blanks and #-comments, strips matching
+    quotes. Never overrides variables already present in the environment.
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if not key or key in os.environ:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ[key] = value
+
+
+_load_dotenv()
+
 # ---------------------------------------------------------------------------
 # Sentry initialization
 # ---------------------------------------------------------------------------
@@ -690,15 +716,47 @@ def _ollama_generate(
 COLAB_INFERENCE_URL = os.getenv("COLAB_INFERENCE_URL", "").rstrip("/")
 
 
-async def _colab_generate(model: str, prompt: str, images=None, keep_alive=0, format_json=False, timeout=600) -> str:
-    """Call Colab remote inference endpoint."""
-    if not COLAB_INFERENCE_URL:
-        raise RuntimeError("COLAB_INFERENCE_URL not configured")
-    
-    # For remote, we need to send the image as base64 in the prompt context
-    # The Colab endpoint expects multipart form with file + rubric
-    # This is a simplified version - full implementation would call /grade endpoint
-    raise NotImplementedError("Use _colab_grade_endpoint for full pipeline")
+async def _normalize_colab_result(result: dict) -> dict:
+    """Map the Colab /grade schema onto the local GradeResult shape.
+
+    Colab returns the legacy keys {marks, confidence, feedback, ocr_text};
+    local code expects {total_marks, max_total_marks, overall_confidence,
+    confidence_level, question_grades, flags, ...}. Missing keys get safe
+    defaults; `percentage` is recomputed server-side later in grade().
+    New-schema dicts pass through untouched.
+    """
+    if not isinstance(result, dict):
+        raise ValueError("Colab response is not a JSON object")
+    if "total_marks" in result or "overall_confidence" in result:
+        result.setdefault("max_total_marks", 10)
+        result.setdefault("confidence_level", "medium")
+        result.setdefault("question_grades", [])
+        result.setdefault("flags", [])
+        result.setdefault("model_used", "colab_fallback")
+        result.setdefault("fallback_used", True)
+        result.setdefault("ocr_text", "")
+        return result
+    flags = list(result.get("flags", []) or [])
+    flags.append("colab_legacy_schema")
+    conf = result.get("confidence", 0.5)
+    try:
+        conf = float(conf)
+    except (TypeError, ValueError):
+        conf = 0.5
+    return {
+        "total_marks": result.get("marks", 0),
+        "max_total_marks": result.get("max_total_marks", 10),
+        "overall_confidence": conf,
+        "confidence_level": (
+            "high" if conf >= 0.75 else "low" if conf < 0.4 else "medium"
+        ),
+        "feedback": result.get("feedback", ""),
+        "question_grades": result.get("question_grades", []),
+        "ocr_text": result.get("ocr_text", ""),
+        "model_used": result.get("model_used", "colab_fallback"),
+        "fallback_used": True,
+        "flags": flags,
+    }
 
 
 async def _colab_grade_endpoint(image_b64: str, rubric: str) -> dict:
@@ -780,11 +838,8 @@ async def _grade_with_fallback(
         try:
             result = await _colab_grade_endpoint(image_b64, rubric)
             logger.info(f"[{job_id}] Colab fallback succeeded")
-            # Ensure Colab result has required fields
-            result.setdefault("model_used", "colab_fallback")
-            result.setdefault("fallback_used", True)
-            result.setdefault("ocr_text", "")
-            return result
+            # Normalize legacy Colab keys onto the GradeResult shape
+            return await _normalize_colab_result(result)
         except Exception as colab_e:
             logger.error(f"[{job_id}] Colab fallback also failed: {colab_e}")
             raise RuntimeError(f"Both local and Colab inference failed. Local: {e}, Colab: {colab_e}")

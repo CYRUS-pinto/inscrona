@@ -1,5 +1,6 @@
 """Inscrona launcher — pre-flight checks + uvicorn startup."""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -9,6 +10,28 @@ from loguru import logger
 OLLAMA_URL = "http://127.0.0.1:11434"
 REQUIRED_MODELS = ["glm-ocr", "llama3.2:3b"]
 REQUIRED_DIRS = ["./uploads", "./results"]
+
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Minimal .env loader (stdlib only). Never overrides real env vars."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if not key or key in os.environ:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ[key] = value
+
+
+_load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Pre-flight checks
@@ -57,6 +80,26 @@ def ensure_directories() -> bool:
     return True
 
 
+def check_colab() -> bool:
+    """Non-fatal probe of the optional Colab burst backend.
+
+    Prints MODE: local-only vs hybrid. Never fails startup — a dead
+    tunnel must not block the teacher.
+    """
+    url = os.getenv("COLAB_INFERENCE_URL", "").rstrip("/")
+    if not url:
+        logger.info("MODE: local-only (COLAB_INFERENCE_URL not set)")
+        return True
+    try:
+        resp = requests.get(f"{url}/health", timeout=8)
+        resp.raise_for_status()
+        logger.success("MODE: hybrid (local + Colab burst at {})", url)
+        return True
+    except Exception as exc:
+        logger.warning("MODE: local-only (Colab unreachable: {})", exc)
+        return True
+
+
 def run_checks() -> bool:
     """Run all pre-flight checks. Returns True if all pass."""
     logger.info("Running pre-flight checks...")
@@ -65,6 +108,7 @@ def run_checks() -> bool:
         check_models_installed(),
         ensure_directories(),
     ]
+    check_colab()  # advisory only — never gates startup
     if all(results):
         logger.success("All pre-flight checks passed")
         return True
