@@ -3,556 +3,1058 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inscrona — AI Grading</title>
+  <meta name="description" content="Inscrona grading playground — upload an answer sheet, watch OCR and grading run, inspect per-question marks.">
+  <meta name="theme-color" content="#0a1530">
+  <title>Inscrona — Grading Playground</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235645d4'/%3E%3Cpath d='M9 16.5l5 5 9-11' stroke='white' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       INSCROMA PLAYGROUND — DESIGN TOKENS (ui-ux-pro-max derived)
+       Product: EdTech grading workstation · Style: clean professional SaaS
+       Type: Inter (UI) / JetBrains Mono (data) · Radius 8–12 · 8pt rhythm
+       Contrast: body text ≥ 7:1, secondary ≥ 4.6:1, badges ≥ 4.5:1 (AA)
+       ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-2: #f8f9fb;
+      --border: #e2e5ea;
+      --border-strong: #c9ced6;
+      --ink: #101828;
+      --ink-2: #344054;
+      --ink-3: #475467;
+      --muted: #667085;
+      --brand: #5645d4;
+      --brand-hover: #4534b3;
+      --brand-soft: #efecfd;
+      --brand-ink: #3b2fa0;
+      --success-bg: #ecfdf3; --success-ink: #067647; --success-border: #a6e9c5;
+      --warn-bg: #fffaeb;    --warn-ink: #93370d;    --warn-border: #fedf89;
+      --danger-bg: #fef3f2;  --danger-ink: #b42318;  --danger-border: #fecdca;
+      --info-bg: #eff4ff;    --info-ink: #175cd3;    --info-border: #b2ccff;
+      --radius-s: 8px; --radius-m: 10px; --radius-l: 14px;
+      --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+      --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.10), 0 2px 4px rgba(16, 24, 40, 0.06);
+      --ease: cubic-bezier(0.2, 0, 0, 1);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    html { -webkit-text-size-adjust: 100%; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #ffffff;
-      color: #1a1a1a;
-      min-height: 100vh;
-    }
-
-    /* ── Hero ── */
-    .hero {
-      background: #0a1530;
-      color: #ffffff;
-      padding: 48px 24px 52px;
-      text-align: center;
-    }
-    .hero h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-    .hero p  { margin-top: 8px; font-size: 15px; color: #c0c8d8; }
-
-    /* ── Canvas ── */
-    .canvas { max-width: 640px; margin: -28px auto 48px; padding: 0 16px; }
-
-    /* ── Card ── */
-    .card {
-      background: #ffffff;
-      border: 1px solid #e5e3df;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-      padding: 32px 28px;
-    }
-
-    /* ── Labels & inputs ── */
-    label { display: block; font-size: 14px; font-weight: 600; color: #37352f; margin-bottom: 6px; }
-    input[type="file"],
-    textarea {
-      width: 100%;
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      color: #1a1a1a;
-      background: #f6f5f4;
-      border: 1px solid #c8c4be;
-      border-radius: 8px;
-      padding: 10px 14px;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    input[type="file"] {
-      padding: 0;
-      background: none;
-      border: 2px dashed #e5e3df;
-      cursor: pointer;
-      min-height: 44px;
-    }
-    input[type="file"]:hover { border-color: #5645d4; }
-    textarea { min-height: 100px; resize: vertical; font-size: 13px; }
-    input:focus, textarea:focus { border: 2px solid #5645d4; }
-    select { width: 100%; font-family: 'Inter', sans-serif; font-size: 14px; color: #1a1a1a; background: #ffffff; border: 1px solid #c8c4be; border-radius: 8px; padding: 10px 14px; outline: none; transition: border-color 0.15s; min-height: 44px; }
-    select:focus { border: 2px solid #5645d4; }
-
-    .field { margin-bottom: 20px; }
-
-    /* ── File name ── */
-    .file-name { font-size: 13px; color: #555; margin-top: 6px; min-height: 18px; }
-
-    /* ── Button ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      padding: 10px 18px;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
       font-size: 15px;
-      font-weight: 600;
-      color: #ffffff;
-      background: #5645d4;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      min-height: 44px;
+      line-height: 1.55;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
-    .btn:hover { background: #4534b3; }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled { background: #e5e3df; color: #bbb8b1; cursor: not-allowed; }
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 18px;
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      color: #1a1a1a;
-      background: transparent;
-      border: 1px solid #c8c4be;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      min-height: 44px;
-      text-decoration: none;
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+      border-radius: 6px;
     }
-    .btn-secondary:hover { background: #f6f5f4; border-color: #999; }
+    .skip-link {
+      position: absolute; left: 12px; top: -48px; z-index: 2000;
+      background: var(--ink); color: #fff; font-weight: 600; font-size: 14px;
+      padding: 10px 16px; border-radius: var(--radius-s);
+      transition: top 0.18s var(--ease); text-decoration: none;
+    }
+    .skip-link:focus { top: 12px; }
+    svg.ic { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    svg.ic-sm { width: 15px; height: 15px; }
 
-    /* ── Spinner ── */
+    /* ── Top bar ─────────────────────────────────────────────── */
+    .topbar {
+      background: #0a1530; color: #fff;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; min-height: 58px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800;
+      font-size: 17px; letter-spacing: -0.2px; }
+    .brand-mark {
+      width: 30px; height: 30px; border-radius: 8px; background: var(--brand);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .brand-mark svg { width: 17px; height: 17px; stroke: #fff; fill: none;
+      stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .topbar-sub { font-size: 13px; color: #aab3c5; font-weight: 500; }
+    .topbar-spacer { flex: 1; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: #d5dbe7;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      padding: 7px 13px; border-radius: 999px; white-space: nowrap;
+    }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; flex: none; }
+    .status-pill.live .status-dot { background: #32d583; box-shadow: 0 0 0 3px rgba(50,213,131,0.25); }
+    .status-pill.down .status-dot { background: #f97066; box-shadow: 0 0 0 3px rgba(249,112,102,0.25); }
+    .topbar-link {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #d5dbe7; font-size: 13.5px; font-weight: 600; text-decoration: none;
+      padding: 9px 13px; border-radius: var(--radius-s); min-height: 44px;
+    }
+    .topbar-link:hover { background: rgba(255,255,255,0.09); color: #fff; }
+
+    /* ── Mobile tabs ─────────────────────────────────────────── */
+    .mobile-tabs { display: none; background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 8px 12px 0; gap: 4px; position: sticky; top: 58px; z-index: 90; }
+    .mobile-tab {
+      flex: 1; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-3);
+      background: none; border: none; border-bottom: 3px solid transparent;
+      padding: 12px 8px 10px; cursor: pointer; min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .mobile-tab[aria-selected="true"] { color: var(--brand-ink); border-bottom-color: var(--brand); }
+
+    /* ── Playground grid ─────────────────────────────────────── */
+    .playground {
+      flex: 1; width: 100%; max-width: 1560px; margin: 0 auto;
+      display: grid; grid-template-columns: 300px minmax(0, 1fr) 400px;
+      gap: 16px; padding: 16px 20px 28px; align-items: start;
+    }
+    .pane {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-l); box-shadow: var(--shadow-1);
+      min-width: 0; overflow: hidden;
+    }
+    .pane-head {
+      display: flex; align-items: center; gap: 9px;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+    }
+    .pane-head h2 { font-size: 14px; font-weight: 700; letter-spacing: 0.2px; }
+    .pane-head .count {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--ink-3); border-radius: 999px; padding: 1px 9px;
+    }
+    .pane-head .spacer { flex: 1; }
+    .pane-body { padding: 18px; }
+    .pane-body.flush { padding: 0; }
+
+    /* ── Queue ───────────────────────────────────────────────── */
+    .search-wrap { padding: 12px 14px 6px; }
+    .search-box { position: relative; }
+    .search-box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+    .search-box input {
+      width: 100%; font: inherit; font-size: 14px; color: var(--ink);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-s); padding: 10px 12px 10px 34px; min-height: 44px;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    .queue-list { list-style: none; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+      max-height: calc(100dvh - 330px); min-height: 180px; overflow-y: auto; }
+    .queue-item {
+      width: 100%; font: inherit; text-align: left; cursor: pointer;
+      display: flex; align-items: center; gap: 11px;
+      background: none; border: 1px solid transparent; border-radius: var(--radius-m);
+      padding: 10px 11px; min-height: 60px;
+      transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+    }
+    .queue-item:hover { background: var(--surface-2); border-color: var(--border); }
+    .queue-item[aria-current="true"] { background: var(--brand-soft); border-color: var(--brand); }
+    .score-ring { position: relative; width: 44px; height: 44px; flex: none; }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring b {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--ink);
+    }
+    .queue-meta { min-width: 0; flex: 1; }
+    .queue-id { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 700; color: var(--brand-ink); }
+    .queue-marks { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+    .queue-date { font-size: 12px; color: var(--muted); }
+    .queue-empty { padding: 28px 20px; text-align: center; color: var(--ink-3); font-size: 14px; }
+    .queue-empty svg { width: 34px; height: 34px; color: var(--border-strong); margin-bottom: 8px; }
+    .queue-empty p { margin-bottom: 12px; }
+
+    /* ── Dropzone ────────────────────────────────────────────── */
+    .dropzone {
+      border: 2px dashed var(--border-strong); border-radius: var(--radius-m);
+      background: var(--surface-2); padding: 30px 20px; text-align: center;
+      cursor: pointer; transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+    }
+    .dropzone:hover { border-color: var(--brand); background: var(--brand-soft); }
+    .dropzone.dragging { border-color: var(--brand); background: var(--brand-soft);
+      border-style: solid; transform: scale(1.005); }
+    .dropzone svg.big { width: 36px; height: 36px; color: var(--brand); margin-bottom: 10px; }
+    .dropzone strong { display: block; font-size: 15px; font-weight: 700; }
+    .dropzone span.hint { display: block; font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .dropzone input[type="file"] {
+      position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;
+    }
+    .dz-wrap { position: relative; }
+    .preview-card {
+      display: none; margin-top: 12px; border: 1px solid var(--border);
+      border-radius: var(--radius-m); overflow: hidden; background: #0b1220;
+    }
+    .preview-card.show { display: block; }
+    .preview-card img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
+    .preview-meta {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: var(--surface); padding: 10px 12px; font-size: 13px; color: var(--ink-2);
+    }
+    .preview-meta .mono { font-size: 12.5px; }
+    .preview-meta .spacer { flex: 1; }
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font: inherit; font-size: 13px; font-weight: 600;
+      color: var(--danger-ink); background: var(--danger-bg);
+      border: 1px solid var(--danger-border); border-radius: var(--radius-s);
+      min-width: 44px; min-height: 36px; padding: 6px 12px; cursor: pointer;
+    }
+    .icon-btn:hover { filter: brightness(0.97); }
+
+    /* ── Fields, chips, buttons ──────────────────────────────── */
+    .field { margin-top: 16px; }
+    .field > label { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
+    .field .helper { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+    textarea.rubric {
+      width: 100%; font: inherit; font-size: 14px; color: var(--ink);
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-s); padding: 11px 13px; min-height: 104px;
+      resize: vertical; line-height: 1.6;
+    }
+    textarea.rubric::placeholder { color: var(--muted); }
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
+    .chip {
+      font: inherit; font-size: 13px; font-weight: 600; color: var(--brand-ink);
+      background: var(--brand-soft); border: 1px solid transparent;
+      border-radius: 999px; padding: 7px 14px; min-height: 36px; cursor: pointer;
+      transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+    }
+    .chip:hover { border-color: var(--brand); background: #e4ddfb; }
+    .check-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+    .check { display: inline-flex; align-items: center; gap: 9px; font-size: 14px;
+      font-weight: 500; color: var(--ink-2); cursor: pointer; min-height: 44px; }
+    .check input { width: 19px; height: 19px; accent-color: var(--brand); cursor: pointer; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      font: inherit; font-size: 15px; font-weight: 700; color: #fff;
+      background: var(--brand); border: none; border-radius: var(--radius-s);
+      padding: 12px 20px; min-height: 48px; width: 100%; cursor: pointer;
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
+    }
+    .btn:hover:not(:disabled) { background: var(--brand-hover); }
+    .btn:active:not(:disabled) { transform: scale(0.985); }
+    .btn:disabled { background: #d4d7dd; color: #727c8c; cursor: not-allowed; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2);
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-s); padding: 9px 16px; min-height: 44px;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+    }
+    .btn-ghost:hover { background: var(--surface-2); border-color: var(--ink-3); }
     .spinner {
-      display: none;
-      width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
+      width: 18px; height: 18px; flex: none;
+      border: 2.5px solid rgba(255,255,255,0.35); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Results ── */
-    #results {
-      display: none;
-      margin-top: 24px;
+    /* ── Stages ──────────────────────────────────────────────── */
+    .stages { display: none; margin-top: 16px; border: 1px solid var(--border);
+      border-radius: var(--radius-m); padding: 6px 0; background: var(--surface); }
+    .stages.show { display: block; }
+    .stage { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 14px; }
+    .stage + .stage { border-top: 1px solid var(--border); }
+    .stage-dot {
+      width: 26px; height: 26px; flex: none; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--surface-2); border: 1.5px solid var(--border-strong); color: var(--muted);
     }
-    .result-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 0;
-      border-bottom: 1px solid #e5e3df;
+    .stage-dot svg { width: 14px; height: 14px; }
+    .stage[data-state="active"] .stage-dot { border-color: var(--brand); color: var(--brand); }
+    .stage[data-state="active"] .stage-dot .ring {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid #cfc8f5; border-top-color: var(--brand);
+      animation: spin 0.7s linear infinite;
     }
-    .result-row:last-child { border-bottom: none; }
-    .result-label { font-size: 14px; color: #37352f; font-weight: 500; }
-    .result-value { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
+    .stage[data-state="done"] .stage-dot { background: var(--success-bg);
+      border-color: var(--success-border); color: var(--success-ink); }
+    .stage-name { font-weight: 600; color: var(--ink-2); }
+    .stage[data-state="pending"] .stage-name { color: var(--muted); font-weight: 500; }
+    .stage-note { display: block; font-size: 12.5px; color: var(--muted); font-weight: 400; }
+    .stage-time { margin-left: auto; font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted); }
+    .upload-bar { height: 6px; background: var(--surface-2); border-radius: 999px;
+      overflow: hidden; margin: 2px 16px 12px; display: none; }
+    .upload-bar.show { display: block; }
+    .upload-bar i { display: block; height: 100%; width: 0%; background: var(--brand);
+      border-radius: 999px; transition: width 0.2s var(--ease); }
 
-    /* ── Badges ── */
+    /* ── Alerts / empty states ───────────────────────────────── */
+    .alert {
+      display: none; margin-top: 14px; border-radius: var(--radius-m);
+      padding: 13px 15px; font-size: 14px; line-height: 1.55;
+      border: 1px solid; gap: 10px;
+    }
+    .alert.show { display: flex; }
+    .alert svg { flex: none; margin-top: 2px; }
+    .alert-error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-ink); }
+    .alert-error .btn-ghost { margin-top: 8px; border-color: var(--danger-border); color: var(--danger-ink); }
+    .alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-ink); }
+    .inspector-empty { padding: 40px 24px; text-align: center; color: var(--ink-3); }
+    .inspector-empty svg { width: 40px; height: 40px; color: var(--border-strong); margin-bottom: 10px; }
+    .inspector-empty strong { display: block; font-size: 15px; color: var(--ink-2); margin-bottom: 4px; }
+    .inspector-empty p { font-size: 13.5px; }
+
+    /* ── Score hero ──────────────────────────────────────────── */
+    .score-hero { display: flex; align-items: center; gap: 18px; padding: 20px 18px 16px; }
+    .donut { position: relative; width: 112px; height: 112px; flex: none; }
+    .donut svg { transform: rotate(-90deg); }
+    .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; }
+    .donut-center b { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+    .donut-center span { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+    .score-meta { min-width: 0; }
+    .score-total { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
+    .score-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px; }
     .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12.5px; font-weight: 700; border-radius: 999px;
+      padding: 4px 11px; border: 1px solid;
     }
-    .badge-green  { background: #d9f3e1; color: #1aae39; }
-    .badge-orange { background: #ffe8d4; color: #793400; }
-    .badge-red    { background: #ffebeb; color: #e03131; }
+    .badge svg { width: 13px; height: 13px; }
+    .badge-green { background: var(--success-bg); color: var(--success-ink); border-color: var(--success-border); }
+    .badge-amber { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
+    .badge-red   { background: var(--danger-bg); color: var(--danger-ink); border-color: var(--danger-border); }
+    .badge-blue  { background: var(--info-bg); color: var(--info-ink); border-color: var(--info-border); }
+    .badge-gray  { background: var(--surface-2); color: var(--ink-3); border-color: var(--border); }
+    .flag-row { display: flex; gap: 7px; flex-wrap: wrap; padding: 0 18px 6px; }
+    .flag-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 500;
+      background: var(--warn-bg); color: var(--warn-ink);
+      border: 1px dashed var(--warn-border); border-radius: 6px; padding: 3px 9px;
+    }
+    .flag-chip svg { width: 12px; height: 12px; }
 
-    /* ── OCR Transcript ── */
-    .ocr-section {
-      margin-top: 20px;
-    }
-    .ocr-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #5d5b54;
-      cursor: pointer;
-      border: none;
-      background: none;
-      padding: 0;
-      font-family: 'Inter', sans-serif;
-    }
-    .ocr-toggle:hover { color: #1a1a1a; }
-    .ocr-toggle svg {
-      width: 14px;
-      height: 14px;
-      transition: transform 0.15s;
-    }
-    .ocr-toggle.open svg { transform: rotate(90deg); }
-    .ocr-box {
-      display: none;
-      margin-top: 10px;
-      background: #f6f5f4;
-      border: 1px solid #e5e3df;
-      border-radius: 8px;
-      padding: 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      color: #1a1a1a;
-      white-space: pre-wrap;
-      max-height: 320px;
-      overflow-y: auto;
-    }
+    /* ── Question cards ──────────────────────────────────────── */
+    .q-list { padding: 12px 18px 6px; display: flex; flex-direction: column; gap: 10px; }
+    .q-card { border: 1px solid var(--border); border-radius: var(--radius-m); padding: 13px 15px; }
+    .q-top { display: flex; align-items: baseline; gap: 9px; }
+    .q-id { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 700;
+      color: var(--brand-ink); background: var(--brand-soft); border-radius: 6px; padding: 2px 8px; }
+    .q-text { font-size: 13.5px; font-weight: 600; color: var(--ink-2); flex: 1; min-width: 0; }
+    .q-marks { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+    .meter { height: 7px; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 999px; overflow: hidden; margin-top: 9px; }
+    .meter i { display: block; height: 100%; border-radius: 999px; }
+    .q-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+    .crit { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; color: var(--ink-3); }
+    .q-feedback { font-size: 13.5px; color: var(--ink-2); margin-top: 8px; line-height: 1.6; }
 
-    .feedback-box {
-      margin-top: 16px;
-      background: #f6f5f4;
-      border: 1px solid #e5e3df;
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #1a1a1a;
-      white-space: pre-wrap;
+    /* ── Feedback / transcript / meta ────────────────────────── */
+    .section-label { font-size: 12px; font-weight: 800; letter-spacing: 0.7px;
+      text-transform: uppercase; color: var(--muted); padding: 16px 18px 8px; }
+    .feedback-box { margin: 0 18px; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-m); padding: 14px 15px; font-size: 14px; line-height: 1.65;
+      color: var(--ink-2); white-space: pre-wrap; }
+    details.transcript { margin: 12px 18px 0; border: 1px solid var(--border);
+      border-radius: var(--radius-m); overflow: hidden; }
+    details.transcript summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px;
+      padding: 12px 15px; font-size: 14px; font-weight: 600; color: var(--ink-2);
+      background: var(--surface); min-height: 44px;
     }
+    details.transcript summary::-webkit-details-marker { display: none; }
+    details.transcript summary:hover { background: var(--surface-2); }
+    details.transcript summary svg { transition: transform 0.18s var(--ease); color: var(--muted); }
+    details.transcript[open] summary svg { transform: rotate(90deg); }
+    details.transcript summary .spacer { flex: 1; }
+    .transcript-body { border-top: 1px solid var(--border); background: #0b1220; }
+    .transcript-body pre {
+      margin: 0; padding: 15px; font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px; line-height: 1.7; color: #dbe2ef;
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 300px; overflow-y: auto;
+    }
+    .transcript-actions { display: flex; gap: 8px; padding: 10px 12px; background: #0b1220;
+      border-top: 1px solid rgba(255,255,255,0.1); }
+    .mini-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font: inherit; font-size: 12.5px; font-weight: 600; color: #dbe2ef;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 7px; padding: 7px 12px; min-height: 36px; cursor: pointer;
+    }
+    .mini-btn:hover { background: rgba(255,255,255,0.14); }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: var(--border); border-top: 1px solid var(--border); margin-top: 16px; }
+    .meta-cell { background: var(--surface); padding: 11px 18px; min-width: 0; }
+    .meta-cell dt { font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; color: var(--muted); }
+    .meta-cell dd { font-size: 13.5px; font-weight: 600; color: var(--ink-2);
+      margin-top: 3px; overflow-wrap: anywhere; }
+    .meta-cell dd.mono { font-size: 12.5px; }
+    details.rawjson { margin: 0 18px 18px; }
+    details.rawjson summary { font-size: 13px; font-weight: 600; color: var(--muted);
+      cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
+    details.rawjson pre { margin-top: 8px; background: #0b1220; color: #dbe2ef;
+      border-radius: var(--radius-m); padding: 14px; font-size: 12px; line-height: 1.6;
+      max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 
-    .error-box {
-      display: none;
-      margin-top: 16px;
-      background: #ffebeb;
-      border: 1px solid #e03131;
-      border-radius: 8px;
-      padding: 14px 16px;
-      font-size: 14px;
-      color: #e03131;
-    }
+    .howto { font-size: 13.5px; color: var(--ink-3); }
+    .howto ol { margin: 8px 0 0 20px; display: flex; flex-direction: column; gap: 7px; }
+    .howto strong { color: var(--ink-2); }
 
-    /* ── Recent Graded Papers ── */
-    .history-section { margin-top: 32px; }
-    .history-title { font-size: 18px; font-weight: 700; color: #37352f; margin-bottom: 16px; }
-    .history-empty { font-size: 14px; color: #999; text-align: center; padding: 24px 0; }
-    .history-list { list-style: none; }
-    .history-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      background: #f6f5f4;
-      border: 1px solid #e5e3df;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .history-item:hover { background: #eeedea; border-color: #c8c4be; }
-    .history-item-left { display: flex; align-items: center; gap: 12px; }
-    .history-item-id { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #5645d4; font-weight: 500; }
-    .history-item-marks { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
-    .history-item-date { font-size: 12px; color: #999; }
+    footer { text-align: center; font-size: 12.5px; color: var(--muted); padding: 6px 16px 22px; }
 
-    /* ── Detail Modal ── */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.4);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 1240px) {
+      .playground { grid-template-columns: 270px minmax(0, 1fr); }
+      #paneInspector { grid-column: 1 / -1; }
+      #paneInspector .insp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
     }
-    .modal-overlay.open { display: flex; }
-    .modal-card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-      width: 90%;
-      max-width: 560px;
-      max-height: 85vh;
-      overflow-y: auto;
-      padding: 32px 28px;
-      position: relative;
+    @media (max-width: 900px) {
+      .mobile-tabs { display: flex; }
+      .playground { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 24px; }
+      .pane[data-tab] { display: none; }
+      .pane[data-tab].active { display: block; }
+      #paneInspector .insp-cols { display: block; }
+      .queue-list { max-height: 46dvh; }
+      .topbar-sub { display: none; }
     }
-    .modal-close {
-      position: absolute; top: 16px; right: 16px;
-      background: none; border: none; font-size: 20px; color: #999; cursor: pointer;
-      font-family: 'Inter', sans-serif;
-    }
-    .modal-close:hover { color: #1a1a1a; }
-    .modal-title { font-size: 16px; font-weight: 700; color: #37352f; margin-bottom: 16px; }
-    .modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e3df; }
-    .modal-row:last-child { border-bottom: none; }
-    .modal-label { font-size: 14px; color: #555; font-weight: 500; }
-    .modal-value { font-size: 14px; color: #1a1a1a; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-    .modal-feedback {
-      margin-top: 16px;
-      background: #f6f5f4;
-      border: 1px solid #e5e3df;
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #1a1a1a;
-      white-space: pre-wrap;
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      .spinner, .stage[data-state="active"] .stage-dot .ring { animation: none !important;
+        border-top-color: rgba(255,255,255,0.35); }
     }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#workspacePane">Skip to grading workspace</a>
 
-  <div class="hero">
-    <h1>Inscrona</h1>
-    <p>AI-powered answer paper grading</p>
-  </div>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+      Inscrona
+    </div>
+    <span class="topbar-sub">Grading playground</span>
+    <span class="topbar-spacer"></span>
+    <span class="status-pill" id="statusPill" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span><span id="statusText">Connecting…</span>
+    </span>
+    <a class="topbar-link" href="results/export.csv" download>
+      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Export CSV
+    </a>
+  </header>
 
-  <div class="canvas">
-    <div class="card">
-      <form id="gradeForm">
-        <div class="field">
-          <label for="file">Answer paper image</label>
-          <input type="file" id="file" name="file" accept="image/*" required>
-          <div class="file-name" id="fileName">No file chosen</div>
-        </div>
+  <nav class="mobile-tabs" role="tablist" aria-label="Playground sections">
+    <button class="mobile-tab" role="tab" id="tabBtnQueue" aria-selected="false" aria-controls="paneQueue" data-tab-target="paneQueue">
+      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Papers
+    </button>
+    <button class="mobile-tab" role="tab" id="tabBtnGrade" aria-selected="true" aria-controls="paneWorkspace" data-tab-target="paneWorkspace">
+      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m0 0l-5 5m5-5l5 5M4 21h16"/></svg>Grade
+    </button>
+    <button class="mobile-tab" role="tab" id="tabBtnResult" aria-selected="false" aria-controls="paneInspector" data-tab-target="paneInspector">
+      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>Result
+    </button>
+  </nav>
 
-        <div class="field">
-          <label for="rubric">Rubric / marking scheme</label>
-          <textarea id="rubric" name="rubric" placeholder="e.g. Q1: definition 2 marks, example 2 marks, conclusion 1 mark. Total: 5"></textarea>
-        </div>
-
-        <button type="submit" class="btn" id="submitBtn">
-          <span class="spinner" id="spinner"></span>
-          <span id="btnLabel">Grade paper</span>
+  <main class="playground" id="main">
+    <!-- ═══ LEFT · PAPERS QUEUE ═══ -->
+    <section class="pane" id="paneQueue" data-tab aria-label="Graded papers" role="tabpanel" aria-labelledby="tabBtnQueue" tabindex="0">
+      <div class="pane-head">
+        <h2>Papers</h2><span class="count" id="queueCount">0</span>
+        <span class="spacer"></span>
+        <button class="btn-ghost" id="refreshQueue" type="button" style="min-height:36px;padding:5px 12px;font-size:13px;">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>
+          Refresh
         </button>
+      </div>
+      <div class="search-wrap">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label for="queueSearch" class="mono" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Search papers</label>
+          <input type="search" id="queueSearch" placeholder="Search by job ID…" autocomplete="off">
+        </div>
+      </div>
+      <ul class="queue-list" id="queueList" aria-label="Graded papers list"></ul>
+    </section>
 
-        <div class="error-box" id="errorBox"></div>
-      </form>
+    <!-- ═══ CENTER · WORKSPACE ═══ -->
+    <section class="pane" id="paneWorkspace" data-tab aria-label="Grading workspace" role="tabpanel" aria-labelledby="tabBtnGrade" tabindex="0">
+      <div class="pane-head" id="workspacePane">
+        <h2>Grade a paper</h2>
+      </div>
+      <div class="pane-body">
+        <form id="gradeForm" novalidate>
+          <div class="dz-wrap">
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload answer sheet image. Activate to browse files, or drag and drop an image here.">
+              <input type="file" id="fileInput" accept="image/*,.heic,.heif" aria-hidden="true" tabindex="-1">
+              <svg class="big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5l5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+              <strong>Drop an answer sheet here, or browse</strong>
+              <span class="hint">JPG, PNG, WebP or HEIC · up to 20 MB · resized to 2000px automatically</span>
+            </div>
+          </div>
+          <div class="preview-card" id="previewCard">
+            <img id="previewImg" alt="Preview of the selected answer sheet">
+            <div class="preview-meta">
+              <span class="mono" id="previewName">—</span>
+              <span id="previewDims">—</span>
+              <span class="spacer"></span>
+              <button class="icon-btn" type="button" id="removeFile">
+                <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-9 0l1 13h10l1-13"/></svg>
+                Remove
+              </button>
+            </div>
+          </div>
 
-      <div id="results">
-        <div class="result-row">
-          <span class="result-label">Marks</span>
-          <span class="result-value" id="rMarks"></span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">Confidence</span>
-          <span class="result-value" id="rConf"></span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">Grade</span>
-          <span id="rBadge"></span>
-        </div>
-        <div class="result-row" style="display:block;">
-          <span class="result-label" style="margin-bottom:8px;">Feedback</span>
-          <div class="feedback-box" id="rFeedback"></div>
-        </div>
-        <div class="ocr-section" id="ocrSection" style="display:none;">
-          <button class="ocr-toggle" id="ocrToggle" type="button" onclick="toggleOcr()">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
-            <span>Show OCR transcript</span>
-          </button>
-          <div class="ocr-box" id="ocrBox"></div>
-        </div>
-      </div>
-    </div>
-    <!-- Recent Graded Papers -->
-    <div class="history-section" id="historySection">
-      <h2 class="history-title">Recent Graded Papers</h2>
-      <div id="historyList"></div>
-      <a href="/results/export.csv" class="btn-secondary" download style="margin-top: 12px;">Export CSV</a>
-    </div>
+          <div class="field">
+            <label for="rubric">Rubric / marking scheme</label>
+            <textarea class="rubric" id="rubric" placeholder="e.g. Q1: definition 2 marks, example 2 marks, conclusion 1 mark. Total: 5"></textarea>
+            <div class="chip-row" role="group" aria-label="Rubric presets">
+              <button type="button" class="chip" data-preset="short">Short answers</button>
+              <button type="button" class="chip" data-preset="essay">Essay</button>
+              <button type="button" class="chip" data-preset="math">Maths / proof</button>
+            </div>
+            <p class="helper">Guides the grader. Leave blank for the default accuracy / completeness / clarity rubric.</p>
+          </div>
 
-  </div>
+          <div class="check-row">
+            <label class="check"><input type="checkbox" id="optOcr" checked> Include OCR transcript</label>
+            <label class="check"><input type="checkbox" id="optBreakdown" checked> Per-question breakdown</label>
+          </div>
 
-  <!-- Detail Modal -->
-  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
-    <div class="modal-card" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeModal()">&times;</button>
-      <h3 class="modal-title" id="modalTitle"></h3>
-      <div class="modal-row">
-        <span class="modal-label">Marks</span>
-        <span class="modal-value" id="modalMarks"></span>
+          <div class="field">
+            <button type="submit" class="btn" id="runBtn" disabled>
+              <span class="spinner" id="runSpinner" hidden></span>
+              <svg class="ic" id="runIcon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="6 4 20 12 6 20" fill="currentColor" stroke="none"/></svg>
+              <span id="runLabel">Select an image to grade</span>
+            </button>
+          </div>
+
+          <div class="alert alert-error" id="errorBox" role="alert"></div>
+        </form>
+
+        <div class="stages" id="stages" aria-label="Grading progress">
+          <div class="upload-bar" id="uploadBar"><i id="uploadFill"></i></div>
+          <div class="stage" data-state="pending" id="stageUpload">
+            <span class="stage-dot" aria-hidden="true"></span>
+            <div><span class="stage-name">Upload</span><span class="stage-note">Sending image to the server</span></div>
+            <span class="stage-time" id="timeUpload"></span>
+          </div>
+          <div class="stage" data-state="pending" id="stageOcr">
+            <span class="stage-dot" aria-hidden="true"></span>
+            <div><span class="stage-name">OCR <span class="mono" style="font-weight:500;">· GLM-OCR</span></span><span class="stage-note">Reading handwriting — typically 2–4 min on this device</span></div>
+            <span class="stage-time" id="timeOcr"></span>
+          </div>
+          <div class="stage" data-state="pending" id="stageGrade">
+            <span class="stage-dot" aria-hidden="true"></span>
+            <div><span class="stage-name">Grading <span class="mono" style="font-weight:500;">· Llama 3.2</span></span><span class="stage-note">Marking against your rubric — typically under a minute</span></div>
+            <span class="stage-time" id="timeGrade"></span>
+          </div>
+          <div class="stage" data-state="pending" id="stageDone">
+            <span class="stage-dot" aria-hidden="true"></span>
+            <div><span class="stage-name">Done</span><span class="stage-note" id="doneNote">Result appears in the inspector</span></div>
+            <span class="stage-time mono" id="elapsed">00:00</span>
+          </div>
+        </div>
+        <p class="helper" id="liveNote" style="display:none;font-size:12.5px;color:var(--muted);margin-top:10px;">
+          Live stage updates are available in the paired mobile app. Here, stages follow typical on-device timing while the grade runs.
+        </p>
+
+        <div class="field howto">
+          <label style="margin-bottom:4px;">How it works</label>
+          <ol>
+            <li><strong>Upload</strong> a photo of the answer sheet.</li>
+            <li><strong>GLM-OCR</strong> transcribes handwriting, preserving question structure.</li>
+            <li><strong>Llama 3.2</strong> marks it against your rubric with per-question feedback.</li>
+          </ol>
+        </div>
       </div>
-      <div class="modal-row">
-        <span class="modal-label">Confidence</span>
-        <span class="modal-value" id="modalConf"></span>
+    </section>
+
+    <!-- ═══ RIGHT · INSPECTOR ═══ -->
+    <section class="pane" id="paneInspector" data-tab aria-label="Grading result" role="tabpanel" aria-labelledby="tabBtnResult" tabindex="0">
+      <div class="pane-head">
+        <h2>Result</h2>
+        <span class="spacer"></span>
+        <span class="mono" id="inspectorJob" style="font-size:12px;color:var(--muted);"></span>
       </div>
-      <div class="modal-row">
-        <span class="modal-label">Grade</span>
-        <span id="modalBadge"></span>
+      <div id="inspectorBody">
+        <div class="inspector-empty" id="inspectorEmpty">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+          <strong>No paper selected</strong>
+          <p>Grade a new paper, or pick one from the Papers queue to inspect its marks.</p>
+        </div>
+        <div id="inspectorResult" hidden>
+          <div class="insp-cols">
+            <div>
+              <div class="score-hero">
+                <div class="donut" role="img" id="donutImg" aria-label="Score donut chart">
+                  <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
+                    <circle cx="56" cy="56" r="46" fill="none" stroke="#eef0f4" stroke-width="11"/>
+                    <circle id="donutArc" cx="56" cy="56" r="46" fill="none" stroke="#5645d4"
+                      stroke-width="11" stroke-linecap="round" stroke-dasharray="0 289" />
+                  </svg>
+                  <div class="donut-center"><b id="donutPct">0%</b><span>score</span></div>
+                </div>
+                <div class="score-meta">
+                  <div class="score-total" id="scoreTotal">0 / 0</div>
+                  <div class="score-sub">total marks</div>
+                  <div class="badge-row" id="badgeRow"></div>
+                </div>
+              </div>
+              <div class="flag-row" id="flagRow"></div>
+              <div class="section-label">Per-question marks</div>
+              <div class="q-list" id="qList"></div>
+            </div>
+            <div>
+              <div class="section-label">Overall feedback</div>
+              <div class="feedback-box" id="feedbackBox"></div>
+              <div class="section-label">OCR transcript</div>
+              <details class="transcript" id="transcriptBox">
+                <summary>
+                  <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                  <span id="transcriptTitle">Show transcript</span>
+                  <span class="spacer"></span>
+                  <span class="mono" id="transcriptLen" style="font-size:12px;color:var(--muted);"></span>
+                </summary>
+                <div class="transcript-body">
+                  <pre id="transcriptText" tabindex="0"></pre>
+                  <div class="transcript-actions">
+                    <button class="mini-btn" type="button" id="copyTranscript">
+                      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </details>
+              <div class="section-label">Run details</div>
+              <dl class="meta-grid">
+                <div class="meta-cell"><dt>Model</dt><dd class="mono" id="metaModel">—</dd></div>
+                <div class="meta-cell"><dt>Grading time</dt><dd class="mono" id="metaTime">—</dd></div>
+                <div class="meta-cell"><dt>Job ID</dt><dd class="mono" id="metaJob">—</dd></div>
+                <div class="meta-cell"><dt>Graded at</dt><dd id="metaDate">—</dd></div>
+              </dl>
+              <details class="rawjson">
+                <summary>View raw JSON</summary>
+                <pre id="rawJson" tabindex="0"></pre>
+              </details>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="modal-row">
-        <span class="modal-label">Date</span>
-        <span class="modal-value" id="modalDate"></span>
-      </div>
-      <div class="modal-row">
-        <span class="modal-label">Job ID</span>
-        <span class="modal-value" id="modalJobId"></span>
-      </div>
-      <div style="margin-top:16px;">
-        <span class="modal-label">Feedback</span>
-        <div class="modal-feedback" id="modalFeedback"></div>
-      </div>
-      <div class="ocr-section" id="modalOcrSection" style="display:none;">
-        <button class="ocr-toggle" id="modalOcrToggle" type="button" onclick="toggleModalOcr()">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>
-          <span>Show OCR transcript</span>
-        </button>
-        <div class="ocr-box" id="modalOcrBox"></div>
-      </div>
-    </div>
-  </div>
+    </section>
+  </main>
+
+  <footer>Runs 100% on this machine · GLM-OCR + Llama 3.2 via Ollama · OCR typically 2–4 min per page</footer>
+  <div id="srStatus" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);"></div>
 
   <script>
-    const form     = document.getElementById('gradeForm');
-    const file     = document.getElementById('file');
-    const fileName = document.getElementById('fileName');
-    const btn      = document.getElementById('submitBtn');
-    const spinner  = document.getElementById('spinner');
-    const btnLabel = document.getElementById('btnLabel');
-    const errorBox = document.getElementById('errorBox');
-    const results  = document.getElementById('results');
-    const ocrSection = document.getElementById('ocrSection');
-    const ocrToggle  = document.getElementById('ocrToggle');
-    const ocrBox     = document.getElementById('ocrBox');
+  'use strict';
+  /* ── tiny helpers ─────────────────────────────────────────── */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const say = (msg) => { $('srStatus').textContent = msg; };
+  const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleString() : '—';
+  const relDate = (ts) => {
+    if (!ts) return '';
+    const s = Math.floor(Date.now() / 1000 - ts);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return new Date(ts * 1000).toLocaleDateString();
+  };
+  const fmtDur = (ms) => {
+    if (ms == null) return '—';
+    const s = Math.round(ms / 1000);
+    return s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  };
+  const mmss = (ms) => {
+    const s = Math.floor(ms / 1000);
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  };
+  const confBand = (c) => c >= 0.7 ? 'green' : c >= 0.4 ? 'amber' : 'red';
+  const pctColor = (p) => p >= 70 ? '#12b76a' : p >= 40 ? '#dc6803' : '#f04438';
 
-    file.addEventListener('change', () => {
-      fileName.textContent = file.files.length ? file.files[0].name : 'No file chosen';
-    });
+  const ICONS = {
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+    alert: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg>',
+    flag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg>'
+  };
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
 
-    function toggleOcr() {
-      const isOpen = ocrBox.style.display === 'block';
-      ocrBox.style.display = isOpen ? 'none' : 'block';
-      ocrToggle.classList.toggle('open', !isOpen);
-      ocrToggle.querySelector('span').textContent = isOpen ? 'Show OCR transcript' : 'Hide OCR transcript';
+  /* ── server status ────────────────────────────────────────── */
+  async function pollStatus() {
+    const pill = $('statusPill'), txt = $('statusText');
+    try {
+      const r = await fetch('/health', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error('down');
+      pill.classList.add('live'); pill.classList.remove('down');
+      txt.textContent = 'Server live';
+    } catch {
+      pill.classList.add('down'); pill.classList.remove('live');
+      txt.textContent = 'Server unreachable';
     }
+  }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!file.files.length) return;
+  /* ── queue ────────────────────────────────────────────────── */
+  let queueCache = [];
+  function marksOf(r) { return r.total_marks ?? r.marks ?? 0; }
+  function confOf(r) { return r.overall_confidence ?? r.confidence ?? 0; }
+  function maxOf(r, d) { return r.max_total_marks ?? 10; }
 
-      errorBox.style.display = 'none';
-      results.style.display  = 'none';
-      spinner.style.display  = 'block';
-      btnLabel.textContent   = 'Grading...';
-      btn.disabled           = true;
+  async function loadQueue() {
+    const list = $('queueList');
+    try {
+      const r = await fetch('/results', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      queueCache = (data.results || []).slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      renderQueue($('queueSearch').value.trim().toLowerCase());
+    } catch {
+      list.innerHTML = '<div class="queue-empty">' + ICONS.alert +
+        '<p>Could not load papers.<br>Is the server running?</p></div>';
+      $('queueCount').textContent = '0';
+    }
+  }
+  function renderQueue(filter) {
+    const list = $('queueList');
+    const items = queueCache.filter((r) =>
+      !filter || (r.job_id || '').toLowerCase().includes(filter));
+    $('queueCount').textContent = String(queueCache.length);
+    if (!items.length) {
+      list.innerHTML = queueCache.length
+        ? '<div class="queue-empty"><p>No papers match your search.</p></div>'
+        : '<div class="queue-empty">' + ICONS.info +
+          '<p>No graded papers yet.</p><p>Grade your first paper to see it here.</p></div>';
+      return;
+    }
+    list.innerHTML = items.map((r) => {
+      const m = marksOf(r), c = confOf(r), mx = maxOf(r);
+      const pct = mx > 0 ? Math.round(100 * m / mx) : 0;
+      const band = confBand(c);
+      const ring = band === 'green' ? '#12b76a' : band === 'amber' ? '#dc6803' : '#f04438';
+      const C = 2 * Math.PI * 18;
+      return '<li><button type="button" class="queue-item" data-job="' + esc(r.job_id) + '"' +
+        (selectedJob === r.job_id ? ' aria-current="true"' : '') +
+        ' aria-label="Inspect paper ' + esc(String(r.job_id).slice(0, 8)) + ', ' + m + ' of ' + mx + ' marks">' +
+        '<span class="score-ring" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 44 44">' +
+        '<circle cx="22" cy="22" r="18" fill="none" stroke="#eef0f4" stroke-width="5"/>' +
+        '<circle cx="22" cy="22" r="18" fill="none" stroke="' + ring + '" stroke-width="5" stroke-linecap="round" ' +
+        'stroke-dasharray="' + (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><b>' + pct + '</b></span>' +
+        '<span class="queue-meta"><span class="queue-id">' + esc(String(r.job_id).slice(0, 8)) + '</span><br>' +
+        '<span class="queue-marks">' + m + ' / ' + mx + ' marks</span><br>' +
+        '<span class="queue-date">' + esc(relDate(r.timestamp)) + '</span></span>' +
+        '</button></li>';
+    }).join('');
+    list.querySelectorAll('.queue-item').forEach((b) =>
+      b.addEventListener('click', () => selectPaper(b.dataset.job, true)));
+  }
 
-      const fd = new FormData();
-      fd.append('file', file.files[0]);
-      fd.append('rubric', document.getElementById('rubric').value);
+  /* ── inspector ────────────────────────────────────────────── */
+  let selectedJob = null;
+  async function selectPaper(jobId, fromUser) {
+    selectedJob = jobId;
+    document.querySelectorAll('.queue-item').forEach((b) =>
+      b.setAttribute('aria-current', String(b.dataset.job === jobId)));
+    try {
+      say('Loading paper ' + String(jobId).slice(0, 8));
+      const r = await fetch('/results/' + encodeURIComponent(jobId), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      renderResult(await r.json());
+      say('Paper loaded');
+      if (fromUser) switchTab('paneInspector');
+    } catch {
+      say('Could not load that paper');
+    }
+  }
+  function confBadge(c, level) {
+    const band = confBand(c);
+    const label = level ? level[0].toUpperCase() + level.slice(1) + ' confidence'
+      : c >= 0.7 ? 'High confidence' : c >= 0.4 ? 'Medium confidence' : 'Low confidence';
+    const icon = band === 'green' ? CHECK_SVG : band === 'amber' ? ICONS.clock : ICONS.alert;
+    return '<span class="badge badge-' + band + '">' + icon + esc(label) + ' · ' + Math.round(c * 100) + '%</span>';
+  }
+  function renderResult(d) {
+    const total = d.total_marks ?? d.marks ?? 0;
+    const max = d.max_total_marks ?? 10;
+    const pct = d.percentage ?? (max > 0 ? Math.round(100 * total / max) : 0);
+    const conf = d.overall_confidence ?? d.confidence ?? 0;
+    const qs = Array.isArray(d.question_grades) ? d.question_grades : [];
+    const flags = Array.isArray(d.flags) ? d.flags : [];
 
-      try {
-        const res = await fetch('/grade', { method: 'POST', body: fd });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.detail || `Server error ${res.status}`);
+    $('inspectorEmpty').hidden = true;
+    $('inspectorResult').hidden = false;
+    $('inspectorJob').textContent = '#' + String(d.job_id || '').slice(0, 8);
+
+    const C = 2 * Math.PI * 46;
+    const arc = $('donutArc');
+    arc.setAttribute('stroke-dasharray', (C * Math.min(pct, 100) / 100).toFixed(1) + ' ' + C.toFixed(1));
+    arc.setAttribute('stroke', pctColor(pct));
+    $('donutPct').textContent = Math.round(pct) + '%';
+    $('donutImg').setAttribute('aria-label', 'Score ' + Math.round(pct) + ' percent, ' + total + ' of ' + max + ' marks');
+    $('scoreTotal').textContent = total + ' / ' + max;
+
+    $('badgeRow').innerHTML = confBadge(conf, d.confidence_level) +
+      (d.fallback_used ? '<span class="badge badge-blue">' + ICONS.info + 'Colab fallback</span>' : '');
+    $('flagRow').innerHTML = flags.map((f) =>
+      '<span class="flag-chip">' + ICONS.flag + esc(f) + '</span>').join('');
+
+    $('qList').innerHTML = qs.length ? qs.map((q) => {
+      const qm = q.marks_awarded ?? 0, qx = q.max_marks ?? 0;
+      const qp = qx > 0 ? Math.min(100, 100 * qm / qx) : 0;
+      const crits = q.criterion_scores && typeof q.criterion_scores === 'object'
+        ? Object.entries(q.criterion_scores).map(([k, v]) =>
+            '<span class="crit">' + esc(k) + ' ' + esc(v) + '</span>').join('') : '';
+      return '<article class="q-card"><div class="q-top">' +
+        '<span class="q-id">' + esc(q.question_id || 'Q?') + '</span>' +
+        '<span class="q-text">' + esc(q.question_text || '') + '</span>' +
+        '<span class="q-marks">' + qm + ' / ' + qx + '</span></div>' +
+        '<div class="meter" role="img" aria-label="' + esc(q.question_id || 'Question') + ': ' + qm + ' of ' + qx + ' marks">' +
+        '<i style="width:' + qp.toFixed(0) + '%;background:' + pctColor(qp) + '"></i></div>' +
+        '<div class="q-sub"><span>Confidence ' + Math.round((q.confidence ?? 0) * 100) + '%</span>' + crits + '</div>' +
+        (q.feedback ? '<p class="q-feedback">' + esc(q.feedback) + '</p>' : '') + '</article>';
+    }).join('') : '<p class="helper" style="padding:4px 0;">No per-question breakdown for this paper.</p>';
+
+    $('feedbackBox').textContent = d.feedback || 'No overall feedback recorded.';
+    const ocr = d.ocr_text || '';
+    $('transcriptTitle').textContent = ocr.trim() ? 'Show transcript' : 'Transcript unavailable';
+    $('transcriptLen').textContent = ocr ? ocr.length + ' chars' : '';
+    $('transcriptText').textContent = ocr || 'No OCR text was saved for this paper.';
+    $('transcriptBox').open = false;
+    $('metaModel').textContent = d.model_used || '—';
+    $('metaTime').textContent = fmtDur(d.processing_time_ms);
+    $('metaJob').textContent = d.job_id || '—';
+    $('metaDate').textContent = fmtDate(d.timestamp || (d.created_at ? Date.parse(d.created_at) / 1000 : null));
+    $('rawJson').textContent = JSON.stringify(d, null, 2);
+  }
+  $('copyTranscript').addEventListener('click', async (e) => {
+    const btn = e.currentTarget, txt = $('transcriptText').textContent;
+    try { await navigator.clipboard.writeText(txt); }
+    catch {
+      const ta = document.createElement('textarea');
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    const old = btn.innerHTML;
+    btn.innerHTML = CHECK_SVG + 'Copied';
+    setTimeout(() => { btn.innerHTML = old; }, 1600);
+  });
+
+  /* ── workspace: file handling ─────────────────────────────── */
+  const dz = $('dropzone'), fi = $('fileInput');
+  let currentFile = null, previewUrl = null;
+  const ACCEPT_EXT = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+  const MAX_BYTES = 20 * 1024 * 1024;
+
+  function showError(msg, retry) {
+    const box = $('errorBox');
+    box.innerHTML = ICONS.alert + '<div><div>' + esc(msg) + '</div>' +
+      (retry ? '<button type="button" class="btn-ghost" id="retryBtn">Retry grading</button>' : '') + '</div>';
+    box.classList.add('show');
+    say('Error: ' + msg);
+    const rb = $('retryBtn');
+    if (rb) rb.addEventListener('click', () => { box.classList.remove('show'); runGrade(); });
+  }
+  function setFile(f) {
+    hideError();
+    if (!f) return clearFile();
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (!(f.type.startsWith('image/') || ACCEPT_EXT.includes(ext))) {
+      showError('“' + f.name + '” is not an image. Please choose a JPG, PNG, WebP or HEIC photo.');
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      showError('“' + f.name + '” is ' + (f.size / 1048576).toFixed(1) + ' MB — the limit is 20 MB. Try a smaller photo.');
+      return;
+    }
+    currentFile = f;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(f);
+    const img = $('previewImg');
+    img.onload = () => {
+      $('previewDims').textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+    };
+    img.src = previewUrl;
+    img.alt = 'Preview of ' + f.name;
+    $('previewName').textContent = f.name + ' · ' + (f.size / 1024).toFixed(0) + ' KB';
+    $('previewCard').classList.add('show');
+    const btn = $('runBtn');
+    btn.disabled = false;
+    $('runLabel').textContent = 'Grade this paper';
+    say('Image selected: ' + f.name);
+  }
+  function clearFile() {
+    currentFile = null;
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    fi.value = '';
+    $('previewCard').classList.remove('show');
+    const btn = $('runBtn');
+    btn.disabled = true;
+    $('runLabel').textContent = 'Select an image to grade';
+  }
+  function hideError() { $('errorBox').classList.remove('show'); }
+
+  dz.addEventListener('click', () => fi.click());
+  dz.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+  });
+  fi.addEventListener('change', () => setFile(fi.files[0]));
+  ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); dz.classList.add('dragging');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); dz.classList.remove('dragging');
+  }));
+  dz.addEventListener('drop', (e) => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) setFile(f);
+  });
+  $('removeFile').addEventListener('click', clearFile);
+
+  /* ── rubric presets ───────────────────────────────────────── */
+  const PRESETS = {
+    short: 'Grade each question out of the marks shown on the paper. Award part-marks for partially correct answers. Penalise only clear factual errors. Total out of 10.',
+    essay: 'Assess thesis, argument structure, evidence and language. Content 4 marks, structure 3 marks, language 3 marks. Quote the strongest and weakest passage. Total out of 10.',
+    math: 'Check every step for correctness. Award method marks even when the final answer is wrong. Flag arithmetic slips separately from conceptual errors. Total out of 10.'
+  };
+  document.querySelectorAll('[data-preset]').forEach((b) =>
+    b.addEventListener('click', () => {
+      $('rubric').value = PRESETS[b.dataset.preset];
+      $('rubric').focus();
+      say('Rubric preset applied: ' + b.textContent);
+    }));
+
+  /* ── run: staged progress (honest timing — WS needs a pairing token) ── */
+  const STAGE_ORDER = ['stageUpload', 'stageOcr', 'stageGrade', 'stageDone'];
+  const DOT_IDLE = '<span style="font-family:monospace;font-size:11px;color:inherit">·</span>';
+  function setStage(id, state) {
+    const el = $(id);
+    el.dataset.state = state;
+    const dot = el.querySelector('.stage-dot');
+    if (state === 'done') dot.innerHTML = CHECK_SVG;
+    else if (state === 'active') dot.innerHTML = '<span class="ring" aria-hidden="true"></span>';
+    else dot.innerHTML = DOT_IDLE;
+  }
+  function resetStages() {
+    STAGE_ORDER.forEach((id) => setStage(id, 'pending'));
+    ['timeUpload', 'timeOcr', 'timeGrade'].forEach((id) => $(id).textContent = '');
+    $('uploadBar').classList.remove('show');
+    $('uploadFill').style.width = '0%';
+  }
+  let tickTimer = null, ocrTimer = null, gradeTimer = null;
+  function runGrade() {
+    if (!currentFile || $('runBtn').disabled && tickTimer) return;
+    if (!currentFile) return;
+    hideError();
+    resetStages();
+    $('stages').classList.add('show');
+    $('liveNote').style.display = 'block';
+    const btn = $('runBtn');
+    btn.disabled = true;
+    $('runSpinner').hidden = false;
+    $('runIcon').style.display = 'none';
+    $('runLabel').textContent = 'Grading…';
+    const t0 = performance.now();
+    $('elapsed').textContent = '00:00';
+    say('Grading started. Optical character recognition typically takes two to four minutes.');
+    clearInterval(tickTimer);
+    tickTimer = setInterval(() => { $('elapsed').textContent = mmss(performance.now() - t0); }, 250);
+
+    setStage('stageUpload', 'active');
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    fd.append('rubric', $('rubric').value);
+    fd.append('return_ocr', $('optOcr').checked ? 'true' : 'false');
+    fd.append('return_question_breakdown', $('optBreakdown').checked ? 'true' : 'false');
+
+    /* Calibrated stage hints (typical on-device timing — completion is always real) */
+    ocrTimer = setTimeout(() => {
+      if (!$('stages').classList.contains('show')) return;
+      setStage('stageUpload', 'done'); $('timeUpload').textContent = 'sent';
+      setStage('stageOcr', 'active');
+    }, 4000);
+    gradeTimer = setTimeout(() => {
+      if (tickTimer && $('stageOcr').dataset.state === 'active') setStage('stageGrade', 'active');
+    }, 150000);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/grade');
+    xhr.timeout = 600000;
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      $('uploadBar').classList.add('show');
+      $('uploadFill').style.width = Math.round(100 * e.loaded / e.total) + '%';
+    };
+    xhr.onload = () => {
+      finishRun();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const d = JSON.parse(xhr.responseText);
+          setStage('stageUpload', 'done'); setStage('stageOcr', 'done'); setStage('stageGrade', 'done');
+          setStage('stageDone', 'done');
+          $('doneNote').textContent = 'Finished in ' + fmtDur(d.processing_time_ms);
+          renderResult(d);
+          selectedJob = d.job_id;
+          loadQueue();
+          say('Grading complete. ' + (d.total_marks ?? 0) + ' of ' + (d.max_total_marks ?? 0) + ' marks.');
+          switchTab('paneInspector');
+        } catch (e) {
+          showError('The server returned an unreadable result. Please retry.', true);
         }
-        const d = await res.json();
-
-        document.getElementById('rMarks').textContent = d.marks + '/10';
-        document.getElementById('rConf').textContent  = (d.confidence * 100).toFixed(0) + '%';
-        document.getElementById('rFeedback').textContent = d.feedback;
-
-        /* Badge: colour from confidence (0-1), text from marks (0-10) */
-        const badge = document.getElementById('rBadge');
-        let cls, txt;
-        if (d.confidence >= 0.7)      { cls = 'badge-green'; }
-        else if (d.confidence >= 0.4) { cls = 'badge-orange'; }
-        else                           { cls = 'badge-red'; }
-
-        if (d.marks >= 7)      { txt = 'Passed'; }
-        else if (d.marks >= 4) { txt = 'Needs improvement'; }
-        else                   { txt = 'Needs review'; }
-
-        badge.className = 'badge ' + cls;
-        badge.textContent = txt;
-
-        /* OCR transcript */
-        if (d.ocr_text && d.ocr_text.trim()) {
-          ocrBox.textContent = d.ocr_text;
-          ocrSection.style.display = 'block';
-          ocrBox.style.display = 'none';
-          ocrToggle.classList.remove('open');
-          ocrToggle.querySelector('span').textContent = 'Show OCR transcript';
-        } else {
-          ocrSection.style.display = 'none';
-        }
-
-        results.style.display = 'block';
-      } catch (err) {
-        errorBox.textContent = err.message;
-        errorBox.style.display = 'block';
-      } finally {
-        spinner.style.display  = 'none';
-        btnLabel.textContent   = 'Grade paper';
-        btn.disabled           = false;
+      } else {
+        let msg = 'Grading failed (HTTP ' + xhr.status + ').';
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch (e) {}
+        showError(msg, true);
       }
+    };
+    xhr.onerror = () => { finishRun(); showError('Network error — is the server still running? Retry when ready.', true); };
+    xhr.ontimeout = () => { finishRun(); showError('Grading timed out after 10 minutes — check the Papers queue; the server may still finish.', false); };
+    xhr.send(fd);
+  }
+  function finishRun() {
+    clearInterval(tickTimer); tickTimer = null;
+    clearTimeout(ocrTimer); clearTimeout(gradeTimer);
+    const btn = $('runBtn');
+    btn.disabled = !currentFile;
+    $('runSpinner').hidden = true;
+    $('runIcon').style.display = '';
+    $('runLabel').textContent = currentFile ? 'Grade this paper' : 'Select an image to grade';
+  }
+  $('gradeForm').addEventListener('submit', (e) => { e.preventDefault(); runGrade(); });
+
+  /* ── mobile tabs ── */
+  const mq = window.matchMedia('(max-width: 900px)');
+  function switchTab(id) {
+    document.querySelectorAll('.pane[data-tab]').forEach((p) => p.classList.toggle('active', p.id === id));
+    document.querySelectorAll('[data-tab-target]').forEach((t) => {
+      const on = t.dataset.tabTarget === id;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
     });
-    /* ── History ── */
-    async function loadHistory() {
-      try {
-        const res = await fetch('/results');
-        if (!res.ok) return;
-        const data = await res.json();
-        const list = data.results || [];
-        const el = document.getElementById('historyList');
-        if (!list.length) {
-          el.innerHTML = '<div class="history-empty">No graded papers yet</div>';
-          return;
-        }
-        el.innerHTML = '<ul class="history-list">' + list.map(r => {
-          const pct = (r.confidence * 100).toFixed(0);
-          const dt = r.timestamp ? new Date(r.timestamp * 1000).toLocaleDateString() : '';
-          return `<li class="history-item" onclick="showDetail('${r.job_id}')">
-            <div class="history-item-left">
-              <span class="history-item-id">${r.job_id.substring(0, 8)}</span>
-              <span class="history-item-marks">${r.marks}/10</span>
-              <span class="badge ${r.confidence >= 0.7 ? 'badge-green' : r.confidence >= 0.4 ? 'badge-orange' : 'badge-red'}">${pct}%</span>
-            </div>
-            <span class="history-item-date">${dt}</span>
-          </li>`;
-        }).join('') + '</ul>';
-      } catch(e) {}
-    }
+    const pane = $(id);
+    if (pane && mq.matches) pane.focus({ preventScroll: true });
+  }
+  document.querySelectorAll('[data-tab-target]').forEach((t) =>
+    t.addEventListener('click', () => switchTab(t.dataset.tabTarget)));
 
-    let currentDetail = null;
-    async function showDetail(jobId) {
-      try {
-        const res = await fetch('/results/' + jobId);
-        if (!res.ok) return;
-        currentDetail = await res.json();
-        document.getElementById('modalTitle').textContent = 'Grade Details';
-        document.getElementById('modalJobId').textContent = currentDetail.job_id;
-        document.getElementById('modalMarks').textContent = currentDetail.marks + '/10';
-        const pct = (currentDetail.confidence * 100).toFixed(0);
-        document.getElementById('modalConf').textContent = pct + '%';
-        const badge = document.getElementById('modalBadge');
-        let cls, txt;
-        if (currentDetail.confidence >= 0.7) cls = 'badge-green';
-        else if (currentDetail.confidence >= 0.4) cls = 'badge-orange';
-        else cls = 'badge-red';
-        if (currentDetail.marks >= 7) txt = 'Passed';
-        else if (currentDetail.marks >= 4) txt = 'Needs improvement';
-        else txt = 'Needs review';
-        badge.className = 'badge ' + cls;
-        badge.textContent = txt;
-        document.getElementById('modalDate').textContent = currentDetail.timestamp ? new Date(currentDetail.timestamp * 1000).toLocaleString() : 'N/A';
-        document.getElementById('modalFeedback').textContent = currentDetail.feedback || 'No feedback';
-        if (currentDetail.ocr_text && currentDetail.ocr_text.trim()) {
-          document.getElementById('modalOcrBox').textContent = currentDetail.ocr_text;
-          document.getElementById('modalOcrSection').style.display = 'block';
-          document.getElementById('modalOcrBox').style.display = 'none';
-          document.getElementById('modalOcrToggle').classList.remove('open');
-          document.getElementById('modalOcrToggle').querySelector('span').textContent = 'Show OCR transcript';
-        } else {
-          document.getElementById('modalOcrSection').style.display = 'none';
-        }
-        document.getElementById('modalOverlay').classList.add('open');
-      } catch(e) {}
-    }
+  /* ── queue controls ── */
+  $('refreshQueue').addEventListener('click', () => { loadQueue(); say('Refreshing papers.'); });
+  $('queueSearch').addEventListener('input', (e) => renderQueue(e.target.value.trim().toLowerCase()));
 
-    function closeModal(e) {
-      if (e && e.target !== document.getElementById('modalOverlay')) return;
-      document.getElementById('modalOverlay').classList.remove('open');
-    }
-
-    function toggleModalOcr() {
-      const box = document.getElementById('modalOcrBox');
-      const toggle = document.getElementById('modalOcrToggle');
-      const isOpen = box.style.display === 'block';
-      box.style.display = isOpen ? 'none' : 'block';
-      toggle.classList.toggle('open', !isOpen);
-      toggle.querySelector('span').textContent = isOpen ? 'Show OCR transcript' : 'Hide OCR transcript';
-    }
-
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-
-    /* Load history on page load */
-    loadHistory();
+  /* ── boot ── */
+  pollStatus(); loadQueue(); switchTab('paneWorkspace');
+  setInterval(pollStatus, 30000);
   </script>
 </body>
 </html>
