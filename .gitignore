@@ -73,6 +73,7 @@ test_ocr.jpg
 test_resized.jpg
 IMG_1226.jpg
 IMG_1227.jpg
+test_data/
 
 # IDE cache
 *.pyc

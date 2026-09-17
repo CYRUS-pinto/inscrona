@@ -198,8 +198,12 @@ def list_results():
             job_id = p.stem.replace("_grade", "")
             results.append({
                 "job_id": job_id,
-                "marks": data.get("marks", 0),
-                "confidence": data.get("confidence", 0),
+                "marks": data.get("total_marks", data.get("marks", 0)),
+                "confidence": data.get("overall_confidence", data.get("confidence", 0)),
+                "total_marks": data.get("total_marks", data.get("marks", 0)),
+                "max_total_marks": data.get("max_total_marks", 10),
+                "percentage": data.get("percentage", 0),
+                "overall_confidence": data.get("overall_confidence", data.get("confidence", 0)),
                 "feedback": data.get("feedback", ""),
                 "timestamp": p.stat().st_mtime,
             })
@@ -225,8 +229,8 @@ def export_csv():
                 job_id = p.stem.replace("_grade", "")
                 writer.writerow([
                     job_id,
-                    data.get("marks", ""),
-                    data.get("confidence", ""),
+                    data.get("total_marks", data.get("marks", "")),
+                    data.get("overall_confidence", data.get("confidence", "")),
                     data.get("feedback", ""),
                 ])
                 yield buf.getvalue()
@@ -403,11 +407,15 @@ async def grade(
             logger.warning(f"[{job_id}] Invalid structured_rubric: {e}")
 
     # Build final result
+    _total = float(result.get("total_marks", 0) or 0)
+    _max = float(result.get("max_total_marks", 10) or 10)
+    # Compute percentage server-side -- never trust the LLM's arithmetic
+    _pct = round(100.0 * _total / _max, 1) if _max > 0 else 0.0
     result_data = {
         "job_id": job_id,
-        "total_marks": result.get("total_marks", 0),
-        "max_total_marks": result.get("max_total_marks", 10),
-        "percentage": result.get("percentage", 0),
+        "total_marks": _total,
+        "max_total_marks": _max,
+        "percentage": _pct,
         "overall_confidence": result.get("overall_confidence", 0.5),
         "confidence_level": result.get("confidence_level", "medium"),
         "feedback": result.get("feedback", ""),
