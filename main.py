@@ -199,7 +199,11 @@ app = FastAPI(title="Inscrona", version="0.1.0")
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "mode": _current_mode(),
+        "colab_circuit_open": _colab_breaker["state"] == "OPEN",
+    }
 
 
 @app.get("/sentry-debug")
@@ -354,6 +358,7 @@ async def grade(
     return_ocr: bool = Form(default=True),
     return_question_breakdown: bool = Form(default=True),
     burst: bool = False,
+    warm: bool = False,
 ):
     """Grade a student answer sheet image."""
     job_id = uuid.uuid4().hex[:12]
@@ -412,6 +417,7 @@ async def grade(
             job_id=job_id,
             return_question_breakdown=return_question_breakdown,
             burst=burst,
+            warm=warm,
         )
         fallback_used = result.get("fallback_used", False)
     except Exception as e:
@@ -728,23 +734,94 @@ def _ollama_generate(
 COLAB_INFERENCE_URL = os.getenv("COLAB_INFERENCE_URL", "").rstrip("/")
 # Short fail-fast probe for burst mode — never the 600s grade timeout.
 COLAB_HEALTH_TIMEOUT_S = 8
+# Circuit breaker: 3 consecutive Colab failures -> OPEN, 60s half-open probe.
+COLAB_BREAKER_THRESHOLD = 3
+COLAB_BREAKER_COOLDOWN_S = 60
+# In-memory like PAIRING_TOKENS: a restart resets to CLOSED (documented).
+_colab_breaker = {"state": "CLOSED", "failures": 0, "opened_at": 0.0}
+
+
+def _breaker_allows() -> bool:
+    """True when a Colab attempt may proceed (CLOSED or cooled-down OPEN)."""
+    s = _colab_breaker
+    if s["state"] == "CLOSED":
+        return True
+    if time.time() - s["opened_at"] >= COLAB_BREAKER_COOLDOWN_S:
+        s["state"] = "HALF-OPEN"
+        return True
+    return False
+
+
+def _breaker_success() -> None:
+    s = _colab_breaker
+    s["state"] = "CLOSED"
+    s["failures"] = 0
+
+
+def _breaker_failure() -> bool:
+    """Record a Colab failure. Returns True when the breaker just OPENED."""
+    s = _colab_breaker
+    s["failures"] += 1
+    if s["failures"] >= COLAB_BREAKER_THRESHOLD and s["state"] != "OPEN":
+        s["state"] = "OPEN"
+        s["opened_at"] = time.time()
+        return True
+    return False
+
+
+def _breaker_reset() -> None:
+    """Test/support hook: force the breaker back to CLOSED."""
+    _colab_breaker.update({"state": "CLOSED", "failures": 0, "opened_at": 0.0})
+
+
+def _current_mode() -> str:
+    """Advertised inference mode: hybrid only when Colab is configured and
+    the breaker is not OPEN; otherwise local-only."""
+    if COLAB_INFERENCE_URL and _colab_breaker["state"] != "OPEN":
+        return "hybrid"
+    return "local-only"
+
+
+async def _colab_unload_models() -> None:
+    """Best-effort zero-resident discipline on the burst backend: ask the
+    Colab daemon to unload both models after a burst paper. Fire-and-forget —
+    failures are logged at debug and never fail the grade."""
+    url = COLAB_INFERENCE_URL
+    if not url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            for model in ("glm-ocr", "llama3.2:3b"):
+                try:
+                    await client.post(f"{url}/api/generate",
+                                      json={"model": model, "keep_alive": 0})
+                except Exception as e:
+                    logger.debug(f"Colab unload hint for {model} failed (ignored)")
+    except Exception:
+        pass
 
 
 async def _colab_healthy() -> bool:
     """Fast health probe for the Colab burst backend.
 
     Returns False on any failure. Never raises, and never logs the tunnel
-    URL (it is a bearer secret — see PLAN.md threat-model note).
+    URL (it is a bearer secret — see PLAN.md threat-model note). Probe
+    outcomes feed the circuit breaker.
     """
     url = COLAB_INFERENCE_URL
-    if not url:
+    if not url or not _breaker_allows():
         return False
     try:
         async with httpx.AsyncClient(timeout=COLAB_HEALTH_TIMEOUT_S) as client:
             resp = await client.get(f"{url}/health")
-            return resp.status_code == 200
+            ok = resp.status_code == 200
     except Exception:
-        return False
+        ok = False
+    if ok:
+        _breaker_success()
+    else:
+        _breaker_failure()
+    return ok
 
 
 async def _normalize_colab_result(result: dict) -> dict:
@@ -820,24 +897,38 @@ async def _grade_with_fallback(
     job_id: str,
     return_question_breakdown: bool = True,
     burst: bool = False,
+    warm: bool = False,
 ) -> dict:
     """
     Try local Ollama first, fallback to Colab on failure.
     With burst=True, Colab is tried FIRST when its health probe passes;
     otherwise degrade to local with a `burst_unavailable` flag (never a 500).
+    With warm=True, the burst session is prime-verified and the backend is
+    asked to unload models after the paper (zero-resident discipline).
     Returns parsed result dict with structured grading output.
     """
     # Burst opt-in: Colab primary when healthy (skip slow local OCR)
     if burst:
-        if await _colab_healthy():
+        if _breaker_allows() and await _colab_healthy():
             logger.info(f"[{job_id}] Burst mode: Colab healthy, using burst primary...")
             _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Burst OCR (Colab)..."})
             try:
+                if warm:
+                    await _colab_healthy()  # prime = second confirmation
                 result = await _colab_grade_endpoint(image_b64, rubric)
+                _breaker_success()
                 logger.info(f"[{job_id}] Burst primary succeeded")
-                return await _normalize_colab_result(result)
-            except Exception as colab_e:
+                out = await _normalize_colab_result(result)
+                flags = out.setdefault("flags", [])
+                if warm and "warmed" not in flags:
+                    flags.append("warmed")
+                await _colab_unload_models()
+                return out
+            except Exception:
+                _breaker_failure()
                 logger.warning(f"[{job_id}] Burst primary failed, degrading to local")
+        elif _colab_breaker["state"] == "OPEN":
+            logger.info(f"[{job_id}] Burst requested but circuit OPEN — instant local path")
         else:
             logger.info(f"[{job_id}] Burst requested but Colab unreachable — local path")
     burst_degraded = burst
@@ -877,6 +968,8 @@ async def _grade_with_fallback(
         flags = parsed.setdefault("flags", [])
         if burst_degraded and "burst_unavailable" not in flags:
             flags.append("burst_unavailable")
+        if _colab_breaker["state"] == "OPEN" and "colab_circuit_open" not in flags:
+            flags.append("colab_circuit_open")
         return {
             **parsed,
             "ocr_text": ocr_text,
@@ -889,16 +982,20 @@ async def _grade_with_fallback(
         
         if not COLAB_INFERENCE_URL:
             raise RuntimeError(f"Local inference failed and no Colab fallback configured: {e}")
-        
-        # Fallback to Colab
-        logger.info(f"[{job_id}] Falling back to Colab: {COLAB_INFERENCE_URL}")
+        if not _breaker_allows():
+            raise RuntimeError(f"Local inference failed; Colab circuit OPEN, skipped: {e}")
+
+        # Fallback to Colab (tunnel URL never logged — bearer secret)
+        logger.info(f"[{job_id}] Falling back to Colab burst backend")
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 10, "message": "Local failed, trying Colab..."})
-        
+
         try:
             result = await _colab_grade_endpoint(image_b64, rubric)
+            _breaker_success()
             logger.info(f"[{job_id}] Colab fallback succeeded")
             # Normalize legacy Colab keys onto the GradeResult shape
             return await _normalize_colab_result(result)
         except Exception as colab_e:
-            logger.error(f"[{job_id}] Colab fallback also failed: {colab_e}")
+            _breaker_failure()
+            logger.error(f"[{job_id}] Colab fallback also failed")
             raise RuntimeError(f"Both local and Colab inference failed. Local: {e}, Colab: {colab_e}")

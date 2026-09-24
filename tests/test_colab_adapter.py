@@ -192,6 +192,133 @@ def test_overlap_not_serialized():
         main._ollama_generate = o_gen
 
 
+def test_breaker_transitions():
+    main._breaker_reset()
+    check("breaker starts closed", main._breaker_allows() is True)
+    main._breaker_failure()
+    main._breaker_failure()
+    check("breaker closed after 2", main._colab_breaker["state"] == "CLOSED")
+    opened = main._breaker_failure()
+    check("breaker opens on 3rd", opened is True
+          and main._breaker_allows() is False)
+    main._colab_breaker["opened_at"] -= 61
+    check("breaker half-open after cooldown", main._breaker_allows() is True
+          and main._colab_breaker["state"] == "HALF-OPEN")
+    main._breaker_success()
+    check("breaker resets on success", main._colab_breaker["state"] == "CLOSED"
+          and main._colab_breaker["failures"] == 0)
+
+
+def test_breaker_open_instant_skip():
+    o_gen, o_health, o_ep = (
+        main._ollama_generate, main._colab_healthy, main._colab_grade_endpoint)
+    try:
+        main._breaker_reset()
+        main._ollama_generate = _fake_local_ok
+        main._colab_healthy = _healthy  # would succeed if consulted
+
+        def must_not_run(*a, **k):
+            raise AssertionError("Colab must be skipped while breaker OPEN")
+        main._colab_grade_endpoint = must_not_run
+        main._breaker_failure()
+        main._breaker_failure()
+        main._breaker_failure()
+        r = asyncio.run(main._grade_with_fallback("aGk=", "r", "jD", burst=True))
+        flags = r.get("flags", [])
+        check("open instant local", r["fallback_used"] is False)
+        check("open flags set", "burst_unavailable" in flags
+              and "colab_circuit_open" in flags, str(flags))
+    finally:
+        main._breaker_reset()
+        (main._ollama_generate, main._colab_healthy,
+         main._colab_grade_endpoint) = (o_gen, o_health, o_ep)
+
+
+def test_warm_prime_and_unload():
+    o_gen, o_health, o_ep, o_unload = (
+        main._ollama_generate, main._colab_healthy,
+        main._colab_grade_endpoint, main._colab_unload_models)
+    calls = {"healthy": 0, "unload": 0, "endpoint": 0}
+    try:
+        main._breaker_reset()
+        main._ollama_generate = _fake_local_ok
+
+        async def counting_healthy():
+            calls["healthy"] += 1
+            return True
+        main._colab_healthy = counting_healthy
+
+        async def counting_ep(image_b64, rubric):
+            calls["endpoint"] += 1
+            return await _fake_colab_ok(image_b64, rubric)
+        main._colab_grade_endpoint = counting_ep
+
+        async def counting_unload():
+            calls["unload"] += 1
+        main._colab_unload_models = counting_unload
+
+        r = asyncio.run(main._grade_with_fallback(
+            "aGk=", "r", "jE", burst=True, warm=True))
+        check("warm prime probed", calls["healthy"] >= 2, str(calls))
+        check("warm endpoint once", calls["endpoint"] == 1, str(calls))
+        check("warm unload called", calls["unload"] == 1, str(calls))
+        check("warm flag set", "warmed" in r.get("flags", []))
+        check("warm colab result", r["fallback_used"] is True
+              and r["total_marks"] == 9)
+    finally:
+        main._breaker_reset()
+        (main._ollama_generate, main._colab_healthy,
+         main._colab_grade_endpoint, main._colab_unload_models) = (
+            o_gen, o_health, o_ep, o_unload)
+
+
+def test_local_failure_breaker_open():
+    o_gen, o_ep, o_url = (
+        main._ollama_generate, main._colab_grade_endpoint,
+        main.COLAB_INFERENCE_URL)
+    try:
+        main._breaker_reset()
+        main._breaker_failure()
+        main._breaker_failure()
+        main._breaker_failure()
+
+        def boom(*a, **k):
+            raise ConnectionError("ollama down")
+        main._ollama_generate = boom
+
+        def must_not_run(*a, **k):
+            raise AssertionError("Colab must be skipped while breaker OPEN")
+        main._colab_grade_endpoint = must_not_run
+        main.COLAB_INFERENCE_URL = "http://mocked-colab/"
+        try:
+            asyncio.run(main._grade_with_fallback("aGk=", "r", "jF"))
+            check("open failure raises", False)
+        except RuntimeError as e:
+            check("open failure raises", "circuit OPEN" in str(e), str(e)[:90])
+    finally:
+        main._breaker_reset()
+        (main._ollama_generate, main._colab_grade_endpoint,
+         main.COLAB_INFERENCE_URL) = (o_gen, o_ep, o_url)
+
+
+def test_health_mode_field():
+    from fastapi.testclient import TestClient
+    main._breaker_reset()
+    c = TestClient(main.app)
+    r = c.get("/health")
+    body = r.json()
+    check("health mode local-only", r.status_code == 200
+          and body.get("mode") == "local-only"
+          and body.get("colab_circuit_open") is False, str(body))
+    main._breaker_failure()
+    main._breaker_failure()
+    main._breaker_failure()
+    body = c.get("/health").json()
+    check("health mode open flag", body.get("colab_circuit_open") is True
+          and body.get("mode") == "local-only", str(body))
+    main._breaker_reset()
+
+
 if __name__ == "__main__":
     test_normalize_legacy()
     test_normalize_bands()
@@ -201,5 +328,10 @@ if __name__ == "__main__":
     test_routing_matrix()
     test_health_timeout_fast()
     test_overlap_not_serialized()
+    test_breaker_transitions()
+    test_breaker_open_instant_skip()
+    test_warm_prime_and_unload()
+    test_local_failure_breaker_open()
+    test_health_mode_field()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     sys.exit(1 if FAIL else 0)

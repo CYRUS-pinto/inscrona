@@ -93,10 +93,12 @@ def check_colab() -> bool:
     try:
         resp = requests.get(f"{url}/health", timeout=8)
         resp.raise_for_status()
-        logger.success("MODE: hybrid (local + Colab burst at {})", url)
+        logger.success("MODE: hybrid (local + Colab burst reachable)")
         return True
-    except Exception as exc:
-        logger.warning("MODE: local-only (Colab unreachable: {})", exc)
+    except Exception:
+        # Fixed string on purpose: the tunnel URL is a bearer secret and
+        # must never land in logs (exceptions may echo it).
+        logger.warning("MODE: local-only (Colab burst unreachable)")
         return True
 
 

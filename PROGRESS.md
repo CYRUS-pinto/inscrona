@@ -822,3 +822,20 @@ No crash (pre-fix run OOM-500d on the same image). Timing 255s -> 161s
   `processing_time_ms` averages; XHR timeout now offers "Poll the Papers
   queue" instead of blind resubmit. No fake %, no token in browser.
 - Headless render proof: badge + checkbox visible, Server live, 25 papers.
+
+## Wave 2 Task 2 DONE (circuit breaker + burst-warm + health mode)
+- Module-global breaker (stdlib, in-memory, restart→CLOSED): CLOSED→OPEN
+  after 3 consecutive Colab failures, 60s half-open probe; OPEN skips Colab
+  instantly; `mode` (`local-only|hybrid`) + `colab_circuit_open` in
+  `GET /health`; `colab_circuit_open` also appended to result flags.
+- `POST /grade?burst=true&warm=1`: prime probe + `warmed` flag +
+  best-effort per-paper unload POSTs (`keep_alive: 0` to Colab daemon,
+  fire-and-forget). keep_alive stays 0 everywhere (golden rule intact).
+- Threat-note compliance: tunnel URL removed from fallback log line and
+  from `check_colab()` success/warning lines (fixed strings only).
+- Tests: 41 passed, 0 failed (plain) + pytest 13 passed. Breaker
+  transitions, OPEN instant-skip (Colab endpoint asserted never called),
+  warm prime/unload call counts, health mode field — all green.
+- LIVE: `GET /health` →
+  `{"status":"ok","mode":"local-only","colab_circuit_open":false}`.
+  Headless render: MODE badge + burst toggle visible, 25 papers.
