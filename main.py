@@ -353,6 +353,7 @@ async def grade(
     structured_rubric: Optional[str] = Form(default=None),
     return_ocr: bool = Form(default=True),
     return_question_breakdown: bool = Form(default=True),
+    burst: bool = False,
 ):
     """Grade a student answer sheet image."""
     job_id = uuid.uuid4().hex[:12]
@@ -410,6 +411,7 @@ async def grade(
             rubric=rubric,
             job_id=job_id,
             return_question_breakdown=return_question_breakdown,
+            burst=burst,
         )
         fallback_used = result.get("fallback_used", False)
     except Exception as e:
@@ -724,6 +726,25 @@ def _ollama_generate(
 # Colab Remote Inference Fallback
 # ---------------------------------------------------------------------------
 COLAB_INFERENCE_URL = os.getenv("COLAB_INFERENCE_URL", "").rstrip("/")
+# Short fail-fast probe for burst mode — never the 600s grade timeout.
+COLAB_HEALTH_TIMEOUT_S = 8
+
+
+async def _colab_healthy() -> bool:
+    """Fast health probe for the Colab burst backend.
+
+    Returns False on any failure. Never raises, and never logs the tunnel
+    URL (it is a bearer secret — see PLAN.md threat-model note).
+    """
+    url = COLAB_INFERENCE_URL
+    if not url:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=COLAB_HEALTH_TIMEOUT_S) as client:
+            resp = await client.get(f"{url}/health")
+            return resp.status_code == 200
+    except Exception:
+        return False
 
 
 async def _normalize_colab_result(result: dict) -> dict:
@@ -798,22 +819,47 @@ async def _grade_with_fallback(
     rubric: str,
     job_id: str,
     return_question_breakdown: bool = True,
+    burst: bool = False,
 ) -> dict:
     """
     Try local Ollama first, fallback to Colab on failure.
+    With burst=True, Colab is tried FIRST when its health probe passes;
+    otherwise degrade to local with a `burst_unavailable` flag (never a 500).
     Returns parsed result dict with structured grading output.
     """
-    # Try local first
+    # Burst opt-in: Colab primary when healthy (skip slow local OCR)
+    if burst:
+        if await _colab_healthy():
+            logger.info(f"[{job_id}] Burst mode: Colab healthy, using burst primary...")
+            _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Burst OCR (Colab)..."})
+            try:
+                result = await _colab_grade_endpoint(image_b64, rubric)
+                logger.info(f"[{job_id}] Burst primary succeeded")
+                return await _normalize_colab_result(result)
+            except Exception as colab_e:
+                logger.warning(f"[{job_id}] Burst primary failed, degrading to local")
+        else:
+            logger.info(f"[{job_id}] Burst requested but Colab unreachable — local path")
+    burst_degraded = burst
+
+    # Try local first (blocking Ollama calls run in a worker thread so the
+    # event loop stays free for /health, /results and concurrent grades)
     try:
         logger.info(f"[{job_id}] Attempting local Ollama inference...")
         
         # OCR
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Local OCR (GLM-OCR)..."})
-        ocr_text = _ollama_generate("glm-ocr", OCR_PROMPT, images=[image_b64], keep_alive=0, num_ctx=8192)
+        ocr_text = await asyncio.to_thread(
+            _ollama_generate, "glm-ocr", OCR_PROMPT,
+            images=[image_b64], keep_alive=0, num_ctx=8192,
+        )
         
         _broadcast_progress(job_id, {"stage": "grading", "progress": 50, "message": "Local grading (Llama 3.2)..."})
         grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
-        grade_raw = _ollama_generate("llama3.2:3b", grade_prompt, keep_alive=0, format_json=True, num_ctx=4096)
+        grade_raw = await asyncio.to_thread(
+            _ollama_generate, "llama3.2:3b", grade_prompt,
+            keep_alive=0, format_json=True, num_ctx=4096,
+        )
         
         # Parse structured response
         cleaned = grade_raw.strip()
@@ -828,6 +874,9 @@ async def _grade_with_fallback(
                 raise ValueError(f"Missing required field: {field}")
         
         logger.info(f"[{job_id}] Local inference succeeded")
+        flags = parsed.setdefault("flags", [])
+        if burst_degraded and "burst_unavailable" not in flags:
+            flags.append("burst_unavailable")
         return {
             **parsed,
             "ocr_text": ocr_text,

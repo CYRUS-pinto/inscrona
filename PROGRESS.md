@@ -795,3 +795,30 @@ processing_time_ms=160559 (~2.7 min), model=glm-ocr + llama3.2:3b (local),
 flags=[], ocr_chars=576, questions=3.`
 No crash (pre-fix run OOM-500d on the same image). Timing 255s -> 161s
 (~37% faster) with stability restored. Wave 0 DONE.
+
+## Wave 1 tracer DONE (Task 1: to_thread + ?burst=true routing)
+- `asyncio.to_thread` wraps both `_ollama_generate` calls in
+  `_grade_with_fallback` (main.py); event loop stays free during inference.
+- Overlap proof (mocked 10s sleeps, 2 concurrent grades):
+  `overlap wall clock: 20.0s (serialized would be ~40s)`. Throughput
+  proven; single-grade p50 unchanged (as predicted).
+- `POST /grade?burst=true`: Colab health-gate (8s) first; healthy → Colab
+  primary via `_colab_grade_endpoint` + adapter; unhealthy/empty URL →
+  local path + `burst_unavailable` flag (never 500).
+- Mocked routing matrix green: default-local, burst-healthy-colab
+  (GradeResult validates), burst-dead-local+flag. Health-timeout fail-fast
+  green. Full file: 26 passed, 0 failed.
+- LIVE proof (`?burst=true`, no COLAB URL → degraded local, HTTP 200):
+  `total_marks=60.0/100.0, percentage=60.0, overall_confidence=0.8/high,
+  processing_time_ms=166206, flags=['burst_unavailable'],
+  model=glm-ocr + llama3.2:3b (local), questions=3, ocr_chars=770.`
+- Headless render: MODE badge + burst checkbox visible, queue at 25 papers.
+
+## Wave 2 Task 4 DONE (perceived-speed UX, templates/index.html only)
+- MODE badge in topbar (`MODE · local-only`; renders local-only until the
+  Task 2 `/health` mode field exists — BLOCKED-dependency noted in code).
+- Colab burst checkbox → POSTs `/grade?burst=true`; burst hint copy
+  (typically under a minute on burst); session pace note from measured
+  `processing_time_ms` averages; XHR timeout now offers "Poll the Papers
+  queue" instead of blind resubmit. No fake %, no token in browser.
+- Headless render proof: badge + checkbox visible, Server live, 25 papers.
