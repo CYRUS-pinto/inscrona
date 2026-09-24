@@ -762,3 +762,36 @@ SUCCESS: The process with PID 6584 has been terminated.
 - Sentry dashboard check: confirm `ZeroDivisionError` from `/sentry-debug` at cyrus-sh.sentry.io.
 - Mobile build: `cd mobile && npx expo install` then `eas build` (needs Expo login).
 - Tunnel URL rotates: for a stable URL use Tailscale (already installed) `tailscale serve`/`funnel`, or a localtunnel subdomain.
+
+## Wave 0 verdict — GPU proof gate (Phase 1, Task 0)
+
+### Readings
+1. `nvidia-smi`: NOT INSTALLED. Non-PATH fallback under
+   `$env:ProgramFiles\NVIDIA Corporation\NVSMI\`: NOT PRESENT.
+2. `ollama ps` DURING live glm-ocr inference (test_sheet_1.jpg):
+   `glm-ocr:latest, 11 GB, 59%/41% CPU/GPU, CONTEXT 131072`.
+   Majority-CPU split; 11 GB resident (2.2 GB weights + ~8 GB KV cache).
+3. `%LOCALAPPDATA%\Ollama\server.log` inference-compute line:
+   `library=Vulkan, name="AMD Radeon RX 6600M", discrete, 8.0 GiB total`.
+4. Live `/grade` BEFORE the fix: Ollama `/api/generate` HTTP 500. Log shows
+   `llama_kv_cache: Vulkan0 KV buffer size = 4096.00 MiB`, then
+   `ggml_vulkan: Failed to allocate pinned memory (ErrorOutOfDeviceMemory)`,
+   `llama-server terminated exit 0xc0000005`. The native 131072 ctx builds a
+   4 GiB KV cache that OOMs the 8 GiB 6600M.
+5. `ollama show glm-ocr`: arch glmocr, 1.1B, ctx 131072, F16, vision.
+   `ollama list`: glm-ocr 2.2 GB, llama3.2:3b 2.0 GB.
+
+### Verdict
+`VERDICT: CPU-heavy hybrid (AMD RX 6600M via Vulkan, 59/41 split, no NVIDIA).
+Local defaults are UNSTABLE (131072-ctx OOM-crash proven).`
+`Task-3 scope: num_ctx=8192 floor FIRST (stability, pulled forward into Wave 0),
+then CHEAP-WINS-ONLY (edge 1600 + JPEG 75, no 18-run grid).`
+Stability patch applied: `_ollama_generate(..., num_ctx)` param; OCR call
+num_ctx=8192, grading call num_ctx=4096 (main.py). Verification grade fired.
+
+### Verification grade AFTER the floor (test_sheet_1.jpg, same box)
+`total_marks=20.0/20.0, percentage=100.0, overall_confidence=1.0/high,
+processing_time_ms=160559 (~2.7 min), model=glm-ocr + llama3.2:3b (local),
+flags=[], ocr_chars=576, questions=3.`
+No crash (pre-fix run OOM-500d on the same image). Timing 255s -> 161s
+(~37% faster) with stability restored. Wave 0 DONE.

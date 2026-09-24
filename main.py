@@ -681,14 +681,24 @@ def _ollama_generate(
     keep_alive: int = 0,
     format_json: bool = False,
     timeout: int = 600,
+    num_ctx: int | None = None,
 ) -> str:
-    """Call Ollama /api/generate with streaming, return full response text."""
+    """Call Ollama /api/generate with streaming, return full response text.
+
+    num_ctx caps the context window (default: server decides = model native
+    131072 for glm-ocr, whose 4 GiB KV cache OOM-crashes the 8 GiB RX 6600M
+    via Vulkan — see PROGRESS.md Wave 0 verdict). Always pass an explicit
+    num_ctx (8192 for OCR, 4096 for grading).
+    """
+    options: dict = {"num_predict": 2048, "temperature": 0.1}
+    if num_ctx is not None:
+        options["num_ctx"] = num_ctx
     payload: dict = {
         "model": model,
         "prompt": prompt,
         "keep_alive": keep_alive,
         "stream": True,
-        "options": {"num_predict": 2048, "temperature": 0.1},
+        "options": options,
     }
     if images:
         payload["images"] = images
@@ -799,11 +809,11 @@ async def _grade_with_fallback(
         
         # OCR
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Local OCR (GLM-OCR)..."})
-        ocr_text = _ollama_generate("glm-ocr", OCR_PROMPT, images=[image_b64], keep_alive=0)
+        ocr_text = _ollama_generate("glm-ocr", OCR_PROMPT, images=[image_b64], keep_alive=0, num_ctx=8192)
         
         _broadcast_progress(job_id, {"stage": "grading", "progress": 50, "message": "Local grading (Llama 3.2)..."})
         grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
-        grade_raw = _ollama_generate("llama3.2:3b", grade_prompt, keep_alive=0, format_json=True)
+        grade_raw = _ollama_generate("llama3.2:3b", grade_prompt, keep_alive=0, format_json=True, num_ctx=4096)
         
         # Parse structured response
         cleaned = grade_raw.strip()
