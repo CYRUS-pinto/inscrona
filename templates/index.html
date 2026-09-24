@@ -448,6 +448,7 @@
     <span class="status-pill" id="statusPill" role="status" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span><span id="statusText">Connecting…</span>
     </span>
+    <span class="status-pill" id="modeBadge" title="Inference backend mode" style="font-size:12px;">MODE · local-only</span>
     <a class="topbar-link" href="results/export.csv" download>
       <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
       Export CSV
@@ -529,7 +530,10 @@
           <div class="check-row">
             <label class="check"><input type="checkbox" id="optOcr" checked> Include OCR transcript</label>
             <label class="check"><input type="checkbox" id="optBreakdown" checked> Per-question breakdown</label>
+            <label class="check"><input type="checkbox" id="optBurst"> Colab burst</label>
           </div>
+          <p class="helper" id="burstHint" hidden>Burst sends this paper to the Colab T4 tunnel when reachable, otherwise grades locally — typically under a minute on burst.</p>
+          <p class="helper" id="paceNote" aria-live="polite"></p>
 
           <div class="field">
             <button type="submit" class="btn" id="runBtn" disabled>
@@ -699,11 +703,18 @@
     try {
       const r = await fetch('/health', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
       if (!r.ok) throw new Error('down');
+      // BLOCKED-dependency: GET /health has no `mode` field yet (Task 2 owns
+      // main.py in this wave) — render local-only until the field exists.
+      let mode = 'local-only';
+      try { mode = (await r.clone().json()).mode || 'local-only'; } catch (e) {}
+      if (mode !== 'local-only' && mode !== 'hybrid') mode = 'local-only';
       pill.classList.add('live'); pill.classList.remove('down');
       txt.textContent = 'Server live';
+      $('modeBadge').textContent = 'MODE · ' + mode;
     } catch {
       pill.classList.add('down'); pill.classList.remove('live');
       txt.textContent = 'Server unreachable';
+      $('modeBadge').textContent = 'MODE · unreachable';
     }
   }
 
@@ -921,6 +932,10 @@
     if (f) setFile(f);
   });
   $('removeFile').addEventListener('click', clearFile);
+  $('optBurst').addEventListener('change', () => {
+    $('burstHint').hidden = !$('optBurst').checked;
+    say($('optBurst').checked ? 'Colab burst enabled for the next grade.' : 'Colab burst disabled.');
+  });
 
   /* ── rubric presets ───────────────────────────────────────── */
   const PRESETS = {
@@ -953,6 +968,13 @@
     $('uploadFill').style.width = '0%';
   }
   let tickTimer = null, ocrTimer = null, gradeTimer = null;
+  const runTimes = []; /* measured processing_time_ms of this session's grades */
+  function updatePaceNote() {
+    if (!runTimes.length) return;
+    const avg = Math.round(runTimes.reduce((a, b) => a + b, 0) / runTimes.length);
+    $('paceNote').textContent = 'Session pace: last grade took ' + fmtDur(runTimes[runTimes.length - 1]) +
+      (runTimes.length > 1 ? ' · ' + runTimes.length + '-grade average ' + fmtDur(avg) : '') + '.';
+  }
   function runGrade() {
     if (!currentFile || $('runBtn').disabled && tickTimer) return;
     if (!currentFile) return;
@@ -989,7 +1011,7 @@
     }, 150000);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/grade');
+    xhr.open('POST', $('optBurst').checked ? '/grade?burst=true' : '/grade');
     xhr.timeout = 600000;
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
@@ -1004,6 +1026,7 @@
           setStage('stageUpload', 'done'); setStage('stageOcr', 'done'); setStage('stageGrade', 'done');
           setStage('stageDone', 'done');
           $('doneNote').textContent = 'Finished in ' + fmtDur(d.processing_time_ms);
+          if (typeof d.processing_time_ms === 'number') { runTimes.push(d.processing_time_ms); updatePaceNote(); }
           renderResult(d);
           selectedJob = d.job_id;
           loadQueue();
@@ -1019,7 +1042,19 @@
       }
     };
     xhr.onerror = () => { finishRun(); showError('Network error — is the server still running? Retry when ready.', true); };
-    xhr.ontimeout = () => { finishRun(); showError('Grading timed out after 10 minutes — check the Papers queue; the server may still finish.', false); };
+    xhr.ontimeout = () => {
+      finishRun();
+      const box = $('errorBox');
+      box.innerHTML = ICONS.alert + '<div><div>Grading timed out after 10 minutes — the server may still finish. Poll the Papers queue instead of resubmitting.</div>' +
+        '<button type="button" class="btn-ghost" id="pollQueueBtn" style="margin-top:8px;">Poll the Papers queue</button></div>';
+      box.classList.add('show');
+      say('Grading timed out. Poll the Papers queue for the finished result.');
+      $('pollQueueBtn').addEventListener('click', () => {
+        box.classList.remove('show');
+        loadQueue(); switchTab('paneQueue');
+        say('Papers queue refreshed.');
+      });
+    };
     xhr.send(fd);
   }
   function finishRun() {
