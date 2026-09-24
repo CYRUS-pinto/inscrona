@@ -15,7 +15,10 @@ from typing import Dict, Set, Optional, List, Any
 from functools import lru_cache
 from contextlib import asynccontextmanager
 
-import pillow_heif
+try:
+    import pillow_heif
+except ImportError:
+    pillow_heif = None
 import requests
 import httpx
 import sentry_sdk
@@ -72,12 +75,20 @@ OLLAMA_URL = "http://127.0.0.1:11434"
 UPLOAD_DIR = Path("./uploads")
 RESULT_DIR = Path("./results")
 MAX_LONGEST_EDGE = 2000
+# OCR tuning knobs (Phase 1 Task 3 — measured, see PROGRESS.md sweep table).
+# Narrower edge / lower JPEG quality cut vision tokens (faster); the terse
+# prompt cuts prompt tokens. Adopt a combo only via the eval-delta gate.
+OCR_LONGEST_EDGE = 2000
+OCR_JPEG_QUALITY = 90
+OCR_PROMPT_TERSE = False
+GRADE_NUM_PREDICT = 2048
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 RESULT_DIR.mkdir(exist_ok=True)
 
 # Register HEIC opener with Pillow
-pillow_heif.register_heif_opener()
+if pillow_heif:
+    pillow_heif.register_heif_opener()
 
 from PIL import Image  # noqa: E402  (must come after heif registration)
 
@@ -306,6 +317,13 @@ Guidelines:
 
 Output format: Plain text preserving all layout and structure."""
 
+OCR_PROMPT_TERSE_TEXT = """Transcribe all visible text, preserve question numbers and layout."""
+
+
+def _ocr_prompt() -> str:
+    """Full guidelines prompt unless the terse sweep knob is on."""
+    return OCR_PROMPT_TERSE_TEXT if OCR_PROMPT_TERSE else OCR_PROMPT
+
 GRADING_PROMPT_TEMPLATE = """You are an expert academic grader evaluating student answers. Be fair, consistent, and thorough.
 
 STUDENT ANSWER:
@@ -398,12 +416,12 @@ async def grade(
 
     # Resize if too large (GLM-OCR crashes >2300px)
     w, h = img.size
-    if max(w, h) > MAX_LONGEST_EDGE:
-        scale = MAX_LONGEST_EDGE / max(w, h)
+    if max(w, h) > OCR_LONGEST_EDGE:
+        scale = OCR_LONGEST_EDGE / max(w, h)
         new_size = (int(w * scale), int(h * scale))
         img = img.resize(new_size, Image.LANCZOS)
-        img.save(saved_path, "JPEG", quality=90, optimize=True)
-        logger.info(f"[{job_id}] Resized {w}x{h} -> {new_size[0]}x{new_size[1]}")
+        img.save(saved_path, "JPEG", quality=OCR_JPEG_QUALITY, optimize=True)
+        logger.info(f"[{job_id}] Resized {w}x{h} -> {new_size[0]}x{new_size[1]} (edge={OCR_LONGEST_EDGE}, q={OCR_JPEG_QUALITY})")
 
     # -- 3. Convert to base64 --
     with open(saved_path, "rb") as f:
@@ -690,6 +708,7 @@ def _ollama_generate(
     format_json: bool = False,
     timeout: int = 600,
     num_ctx: int | None = None,
+    num_predict: int = 2048,
 ) -> str:
     """Call Ollama /api/generate with streaming, return full response text.
 
@@ -698,7 +717,7 @@ def _ollama_generate(
     via Vulkan — see PROGRESS.md Wave 0 verdict). Always pass an explicit
     num_ctx (8192 for OCR, 4096 for grading).
     """
-    options: dict = {"num_predict": 2048, "temperature": 0.1}
+    options: dict = {"num_predict": num_predict, "temperature": 0.1}
     if num_ctx is not None:
         options["num_ctx"] = num_ctx
     payload: dict = {
@@ -941,7 +960,7 @@ async def _grade_with_fallback(
         # OCR
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Local OCR (GLM-OCR)..."})
         ocr_text = await asyncio.to_thread(
-            _ollama_generate, "glm-ocr", OCR_PROMPT,
+            _ollama_generate, "glm-ocr", _ocr_prompt(),
             images=[image_b64], keep_alive=0, num_ctx=8192,
         )
         
@@ -950,13 +969,30 @@ async def _grade_with_fallback(
         grade_raw = await asyncio.to_thread(
             _ollama_generate, "llama3.2:3b", grade_prompt,
             keep_alive=0, format_json=True, num_ctx=4096,
+            num_predict=GRADE_NUM_PREDICT,
         )
         
         # Parse structured response
         cleaned = grade_raw.strip()
         if cleaned.startswith("```"):
             cleaned = "\n".join([l for l in cleaned.split("\n") if not l.startswith("```")])
-        parsed = json.loads(cleaned)
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as decode_err:
+            logger.warning(f"[{job_id}] Initial JSON parse failed ({decode_err}); attempting standard-library repair...")
+            repaired = cleaned
+            repaired = re.sub(r'("[^"\n]*")\s*\n\s*("([a-zA-Z0-9_]+)"\s*:)', r'\1,\n\2', repaired)
+            repaired = re.sub(r'([\d\.]+|true|false)\s*\n\s*("[\w_]+"\s*:)', r'\1,\n\2', repaired)
+            repaired = re.sub(r'(\}\s*)\n(\s*\{)', r'\1,\n\2', repaired)
+            repaired = re.sub(r',\s*([\}\]])', r'\1', repaired)
+            open_braces = repaired.count('{') - repaired.count('}')
+            open_brackets = repaired.count('[') - repaired.count(']')
+            if open_brackets > 0:
+                repaired += ']' * open_brackets
+            if open_braces > 0:
+                repaired += '}' * open_braces
+            parsed = json.loads(repaired)
+            logger.info(f"[{job_id}] JSON auto-repair succeeded")
         
         # Validate required fields
         required = ["total_marks", "max_total_marks", "percentage", "overall_confidence", "confidence_level", "feedback"]
