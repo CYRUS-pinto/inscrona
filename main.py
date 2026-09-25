@@ -329,10 +329,21 @@ def get_result(job_id: str):
     data = json.loads(result_path.read_text(encoding="utf-8"))
     data["job_id"] = job_id
     data["timestamp"] = result_path.stat().st_mtime
-    if "blocks" not in data or not data["blocks"]:
+    img_path = None
+    for ext in (".jpg", ".jpeg", ".png", ".webp"):
+        p = UPLOAD_DIR / f"{job_id}{ext}"
+        if p.exists():
+            img_path = p
+            break
+
+    # Always refresh with real physical ink boxes if image exists
+    first_box = data.get("blocks", [{}])[0].get("box_2d") if data.get("blocks") else None
+    is_old_uniform = first_box in ([30, 60, 150, 940], [30, 50, 150, 950])
+    if "blocks" not in data or not data["blocks"] or is_old_uniform:
         data["blocks"] = extract_document_blocks(
             data.get("ocr_text", ""),
-            data.get("question_grades", [])
+            data.get("question_grades", []),
+            image_path=img_path
         )
     return data
 
@@ -527,6 +538,13 @@ async def grade(
         flags.append("no_question_breakdown")
 
     result_data["flags"] = flags
+
+    # Generate physical ink document blocks
+    result_data["blocks"] = extract_document_blocks(
+        ocr_text,
+        result_data.get("question_grades", []),
+        image_path=dest_path
+    )
 
     # Validate and create result
     try:

@@ -1,15 +1,110 @@
 import re
-from typing import List, Dict, Any, Optional
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Tuple, Union
+from PIL import Image, ImageOps
+
+def detect_physical_ink_boxes(
+    image_path: Union[str, Path],
+    min_block_height: int = 15,
+    min_block_width: int = 50,
+    dark_threshold: int = 135
+) -> List[Tuple[int, int, int, int]]:
+    """
+    Scans a document image with Pillow to detect the actual physical ink bounding boxes
+    [ymin, xmin, ymax, xmax] on a 0-1000 scale.
+    """
+    path = Path(image_path)
+    if not path.exists():
+        return []
+
+    try:
+        im = Image.open(path).convert('L')
+    except Exception:
+        return []
+
+    # Downscale for high-speed scanning (200x400 grid is fast and sub-millimeter accurate)
+    scan_w, scan_h = 200, 400
+    small = im.resize((scan_w, scan_h), Image.BILINEAR)
+    small = ImageOps.autocontrast(small, cutoff=2)
+    
+    # Extract flattened pixels safely
+    if hasattr(small, "get_flattened_data"):
+        pixels = list(small.get_flattened_data())
+    else:
+        pixels = list(small.getdata())
+
+    # 1. Measure horizontal row ink activity
+    row_activity = []
+    for y in range(scan_h):
+        row = pixels[y * scan_w : (y + 1) * scan_w]
+        dark_count = sum(1 for p in row if p < dark_threshold)
+        row_activity.append(dark_count)
+
+    # 2. Cluster rows into vertical ink bands separated by white space
+    vertical_bands = []
+    in_band = False
+    start_y = 0
+    min_gap = 5 # gap rows to separate paragraphs / questions
+    gap_count = 0
+
+    for y, count in enumerate(row_activity):
+        if count >= 4:
+            if not in_band:
+                in_band = True
+                start_y = y
+            gap_count = 0
+        else:
+            if in_band:
+                gap_count += 1
+                if gap_count >= min_gap:
+                    in_band = False
+                    end_y = y - gap_count
+                    if (end_y - start_y) >= 3:
+                        vertical_bands.append((start_y, end_y))
+    if in_band:
+        vertical_bands.append((start_y, scan_h))
+
+    # 3. For each vertical band, compute horizontal ink extent [xmin, xmax]
+    ink_boxes = []
+    for sy, ey in vertical_bands:
+        col_activity = [0] * scan_w
+        for y in range(sy, min(ey + 1, scan_h)):
+            row = pixels[y * scan_w : (y + 1) * scan_w]
+            for x, p in enumerate(row):
+                if p < dark_threshold:
+                    col_activity[x] += 1
+
+        active_cols = [x for x, c in enumerate(col_activity) if c >= 1]
+        if not active_cols:
+            continue
+
+        ymin = max(0, int(sy * 1000 / scan_h))
+        ymax = min(1000, int(ey * 1000 / scan_h))
+        xmin = max(0, int(min(active_cols) * 1000 / scan_w))
+        xmax = min(1000, int(max(active_cols) * 1000 / scan_w))
+
+        # Add modest padding around text
+        ymin = max(10, ymin - 6)
+        ymax = min(990, ymax + 6)
+        xmin = max(20, xmin - 10)
+        xmax = min(980, xmax + 10)
+
+        if (ymax - ymin) >= min_block_height and (xmax - xmin) >= min_block_width:
+            ink_boxes.append((ymin, xmin, ymax, xmax))
+
+    return ink_boxes
 
 def extract_document_blocks(
     ocr_text: str,
     question_grades: Optional[List[Dict[str, Any]]] = None,
+    image_path: Optional[Union[str, Path]] = None,
     img_width: int = 1000,
     img_height: int = 1000
 ) -> List[Dict[str, Any]]:
     """
-    Parses OCR text and question grading into structured Datalab-style document blocks
-    with normalized bounding box coordinates [ymin, xmin, ymax, xmax] (0 to 1000 scale).
+    Parses OCR text and question grading into structured Datalab-style document blocks.
+    When image_path is provided, uses physical ink segmentation to place bounding boxes
+    around the ACTUAL handwriting and printed questions on the sheet.
     """
     if not ocr_text or not ocr_text.strip():
         return []
@@ -25,9 +120,7 @@ def extract_document_blocks(
             if qid:
                 q_map[qid] = q
 
-    blocks: List[Dict[str, Any]] = []
-    
-    # 1. Detect Header Block (first 1-3 lines if mentioning University, Assessment, College, Exam)
+    # 1. Detect Header Block (first 1-3 lines if mentioning University, Exam, Name, etc.)
     header_lines = []
     curr_idx = 0
     header_keywords = ("university", "college", "school", "internal assessment", "exam", "name", "reg", "roll", "course")
@@ -39,31 +132,21 @@ def extract_document_blocks(
         else:
             break
 
-    if header_lines:
-        blocks.append({
-            "id": "block_header",
-            "type": "PAGEHEADER",
-            "tag": "PageHeader",
-            "text": "\n".join(header_lines),
-            "box_2d": [30, 60, 150, 940],
-            "confidence": 0.95
-        })
-
-    # 2. Parse Remaining Text into Questions and Answer Blocks
-    # Find question boundary indices (e.g. Q1:, Question 1, 1., 1))
+    # 2. Parse Remaining Text into Question and Answer Sections
     q_pattern = re.compile(r"^(?:Q(?:uestion)?\s*(\d+[a-zA-Z]?)|(\d+)[\.\)])\s*[:\.]?", re.IGNORECASE)
+    sections = []
+    if header_lines:
+        sections.append(("HEADER", "\n".join(header_lines)))
 
     current_qid = None
     current_q_text = []
     remaining_lines = lines[curr_idx:] if curr_idx < len(lines) else []
 
-    question_sections = []
-
     for line in remaining_lines:
         m = q_pattern.match(line)
         if m:
             if current_qid is not None or current_q_text:
-                question_sections.append((current_qid, "\n".join(current_q_text)))
+                sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text)))
             num = m.group(1) or m.group(2)
             current_qid = f"Q{num.upper()}"
             current_q_text = [line]
@@ -71,39 +154,108 @@ def extract_document_blocks(
             current_q_text.append(line)
 
     if current_q_text:
-        question_sections.append((current_qid, "\n".join(current_q_text)))
+        sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text)))
 
-    # If no explicit question markers were matched, treat as Q1 or generic handwriting blocks
-    if not question_sections and remaining_lines:
-        question_sections = [("Q1", "\n".join(remaining_lines))]
+    if not sections and remaining_lines:
+        sections = [("Q1", "\n".join(remaining_lines))]
 
-    # Distribute vertical space for question blocks
-    start_y = 170 if header_lines else 50
-    available_height = 950 - start_y
-    step_y = available_height / max(len(question_sections), 1)
+    # 3. Coordinate Generation: Physical Ink Detection vs Proportional Content-Derivation
+    physical_boxes = detect_physical_ink_boxes(image_path) if image_path else []
 
-    for i, (qid, text) in enumerate(question_sections):
-        b_ymin = int(start_y + i * step_y)
-        b_ymax = int(min(970, start_y + (i + 1) * step_y - 20))
-        
-        # Check if diagram is mentioned
-        has_diagram = "[diagram" in text.lower() or "graph" in text.lower() or "circuit" in text.lower()
-        block_type = "DIAGRAM" if has_diagram else ("QUESTION" if qid else "HANDWRITING")
+    blocks: List[Dict[str, Any]] = []
 
-        q_info = q_map.get(qid.upper(), {}) if qid else {}
+    if physical_boxes:
+        M = len(sections)
+        N = len(physical_boxes)
+        weights = [max(1, len(txt.splitlines())) * (max(1, len(txt)) ** 0.5) for _, txt in sections]
+        total_w = sum(weights) or 1.0
 
-        block = {
-            "id": f"block_{qid or f'body_{i+1}'}",
-            "type": block_type,
-            "tag": "Question" if qid else "Handwriting",
-            "question_id": qid,
-            "text": text,
-            "box_2d": [b_ymin, 50, b_ymax, 950],
-            "marks": q_info.get("marks_awarded"),
-            "max_marks": q_info.get("max_marks"),
-            "feedback": q_info.get("feedback", ""),
-            "confidence": float(q_info.get("confidence", 0.85))
-        }
-        blocks.append(block)
+        assigned_boxes = []
+        if N == M:
+            assigned_boxes = [list(b) for b in physical_boxes]
+        elif N > M:
+            curr_box_idx = 0
+            for i in range(M):
+                ratio = weights[i] / total_w
+                num_boxes = max(1, round(ratio * N))
+                if i == M - 1:
+                    end_box_idx = N
+                else:
+                    end_box_idx = min(N - (M - 1 - i), curr_box_idx + num_boxes)
+                    end_box_idx = max(curr_box_idx + 1, end_box_idx)
+                sec_boxes = physical_boxes[curr_box_idx:end_box_idx]
+                curr_box_idx = end_box_idx
+                if sec_boxes:
+                    ymin = min(b[0] for b in sec_boxes)
+                    xmin = min(b[1] for b in sec_boxes)
+                    ymax = max(b[2] for b in sec_boxes)
+                    xmax = max(b[3] for b in sec_boxes)
+                    assigned_boxes.append([ymin, xmin, ymax, xmax])
+                else:
+                    assigned_boxes.append(list(physical_boxes[-1]))
+        else:
+            for i in range(M):
+                b_idx = min(N - 1, int(i * N / M))
+                assigned_boxes.append(list(physical_boxes[b_idx]))
+
+        for i, (sec_type, text) in enumerate(sections):
+            box = assigned_boxes[i]
+            is_header = sec_type == "HEADER"
+            qid = sec_type if (sec_type.startswith("Q") or sec_type.startswith("q")) else None
+            has_diagram = "[diagram" in text.lower() or "graph" in text.lower() or "circuit" in text.lower()
+
+            block_type = "PAGEHEADER" if is_header else ("DIAGRAM" if has_diagram else ("QUESTION" if qid else "HANDWRITING"))
+            q_info = q_map.get(qid.upper(), {}) if qid else {}
+
+            blocks.append({
+                "id": f"block_{qid or ('header' if is_header else f'body_{i}')}",
+                "type": block_type,
+                "tag": "PageHeader" if is_header else ("Question" if qid else "Handwriting"),
+                "question_id": qid,
+                "text": text,
+                "box_2d": list(box),
+                "marks": q_info.get("marks_awarded"),
+                "max_marks": q_info.get("max_marks"),
+                "feedback": q_info.get("feedback", ""),
+                "confidence": float(q_info.get("confidence", 0.95 if is_header else 0.85))
+            })
+    else:
+        # Ground coordinates in content line counts and character density (not uniform slices)
+        total_chars = sum(len(text) for _, text in sections) or 1
+        curr_y = 30
+        available_y = 920
+
+        for i, (sec_type, text) in enumerate(sections):
+            is_header = sec_type == "HEADER"
+            qid = sec_type if (sec_type.startswith("Q") or sec_type.startswith("q")) else None
+            has_diagram = "[diagram" in text.lower() or "graph" in text.lower() or "circuit" in text.lower()
+            block_type = "PAGEHEADER" if is_header else ("DIAGRAM" if has_diagram else ("QUESTION" if qid else "HANDWRITING"))
+            q_info = q_map.get(qid.upper(), {}) if qid else {}
+
+            # Proportional height based on text volume
+            line_count = max(1, len(text.splitlines()))
+            char_ratio = len(text) / total_chars
+            allocated_h = int(max(40, min(350, available_y * (0.6 * char_ratio + 0.4 * (line_count / max(len(lines), 1))))))
+
+            ymin = curr_y
+            ymax = min(970, curr_y + allocated_h)
+            curr_y = ymax + 18
+
+            # Calculate content-grounded horizontal span
+            max_line_len = max(len(l) for l in text.splitlines()) if text else 20
+            xmax = min(950, max(380, int(50 + min(900, max_line_len * 15))))
+
+            blocks.append({
+                "id": f"block_{qid or ('header' if is_header else f'body_{i}')}",
+                "type": block_type,
+                "tag": "PageHeader" if is_header else ("Question" if qid else "Handwriting"),
+                "question_id": qid,
+                "text": text,
+                "box_2d": [ymin, 45, ymax, xmax],
+                "marks": q_info.get("marks_awarded"),
+                "max_marks": q_info.get("max_marks"),
+                "feedback": q_info.get("feedback", ""),
+                "confidence": float(q_info.get("confidence", 0.95 if is_header else 0.85))
+            })
 
     return blocks
