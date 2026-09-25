@@ -85,6 +85,7 @@ OCR_JPEG_QUALITY = 90
 OCR_PROMPT_TERSE = False
 GRADE_NUM_PREDICT = 2048
 LOCAL_GRADING_MODEL = os.getenv("LOCAL_GRADING_MODEL", "llama3.2:3b")
+LOCAL_OCR_MODEL = os.getenv("LOCAL_OCR_MODEL", "glm-ocr")
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 RESULT_DIR.mkdir(exist_ok=True)
@@ -639,7 +640,7 @@ async def _process_staged_batch(batch_id: str, rubric: str, engine: str):
             raw_bytes = Path(img_path).read_bytes()
             b64 = base64.b64encode(raw_bytes).decode()
             ocr_text = await asyncio.to_thread(
-                _ollama_generate, "glm-ocr", _ocr_prompt(),
+                _ollama_generate, LOCAL_OCR_MODEL, _ocr_prompt(),
                 images=[b64], keep_alive=300, num_ctx=8192
             )
             await batch_mgr.update_paper_ocr(jid, ocr_text)
@@ -648,7 +649,7 @@ async def _process_staged_batch(batch_id: str, rubric: str, engine: str):
             await batch_mgr.update_paper_ocr(jid, "", error=str(e))
 
     try:
-        await asyncio.to_thread(_ollama_generate, "glm-ocr", "", keep_alive=0)
+        await asyncio.to_thread(_ollama_generate, LOCAL_OCR_MODEL, "", keep_alive=0)
     except Exception:
         pass
 
@@ -1195,7 +1196,7 @@ async def _grade_with_fallback(
         # OCR
         _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Local OCR (GLM-OCR)..."})
         ocr_text = await asyncio.to_thread(
-            _ollama_generate, "glm-ocr", _ocr_prompt(),
+            _ollama_generate, LOCAL_OCR_MODEL, _ocr_prompt(),
             images=[image_b64], keep_alive=0, num_ctx=8192,
         )
         
