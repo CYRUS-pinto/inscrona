@@ -1120,6 +1120,7 @@
 
               <!-- Tab View 1: Marks & Rubric -->
               <div class="datalab-tab-view active" id="tabViewMarks">
+                <div id="choiceRuleBar" style="display:none;margin-bottom:14px;background:#f6f5f4;padding:4px;border-radius:8px;border:1px solid #e5e3df;gap:6px;"></div>
                 <div class="score-hero">
                   <div class="donut" role="img" id="donutImg" aria-label="Score donut chart">
                     <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
@@ -1354,6 +1355,40 @@
     arc.setAttribute('stroke', pctColor(pct));
     $('donutPct').textContent = Math.round(pct) + '%';
     $('donutImg').setAttribute('aria-label', 'Score ' + Math.round(pct) + ' percent, ' + total + ' of ' + max + ' marks');
+    // Choice Rule Setup & Interactive Switcher
+    let activeOptionalQids = [];
+    if (d.choice_rule && d.choice_options && d.choice_options[d.choice_rule]) {
+      activeOptionalQids = d.choice_options[d.choice_rule].optional_qids || [];
+    } else if (qs.some(q => q.is_optional)) {
+      activeOptionalQids = qs.filter(q => q.is_optional).map(q => q.question_id);
+    }
+
+    const crBar = $('choiceRuleBar');
+    if (crBar) {
+      if (d.choice_options && Object.keys(d.choice_options).length > 1) {
+        crBar.style.display = 'flex';
+        crBar.innerHTML = Object.entries(d.choice_options).map(([k, opt]) => {
+          const isActive = (d.choice_rule === k) || (!d.choice_rule && k.startsWith('best_'));
+          return '<button type="button" class="choice-rule-btn" data-rule="' + esc(k) + '" style="flex:1;padding:6px 10px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid ' + (isActive ? '#5645d4' : 'transparent') + ';background:' + (isActive ? '#ffffff' : 'transparent') + ';color:' + (isActive ? '#5645d4' : '#5d5b54') + ';box-shadow:' + (isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none') + ';">' + esc(opt.label) + '</button>';
+        }).join('');
+
+        crBar.querySelectorAll('.choice-rule-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const rule = e.currentTarget.dataset.rule;
+            const opt = d.choice_options[rule];
+            if (!opt) return;
+            d.choice_rule = rule;
+            d.total_marks = opt.total_marks;
+            d.max_total_marks = opt.max_total_marks;
+            d.percentage = opt.percentage;
+            renderResult(d);
+          });
+        });
+      } else {
+        crBar.style.display = 'none';
+      }
+    }
+
     $('scoreTotal').textContent = total + ' / ' + max;
 
     $('badgeRow').innerHTML = confBadge(conf, d.confidence_level) +
@@ -1364,15 +1399,17 @@
     $('qList').innerHTML = qs.length ? qs.map((q) => {
       const qm = q.marks_awarded ?? 0, qx = q.max_marks ?? 0;
       const qp = qx > 0 ? Math.min(100, 100 * qm / qx) : 0;
+      const isOpt = activeOptionalQids.includes(q.question_id) || q.is_optional;
       const crits = q.criterion_scores && typeof q.criterion_scores === 'object'
         ? Object.entries(q.criterion_scores).map(([k, v]) =>
             '<span class="crit">' + esc(k) + ' ' + esc(v) + '</span>').join('') : '';
-      return '<article class="q-card" data-qid="' + esc(q.question_id || '') + '"><div class="q-top">' +
+      return '<article class="q-card" data-qid="' + esc(q.question_id || '') + '" style="' + (isOpt ? 'border:1px dashed #dd5b00;background:#fffaf6;' : '') + '"><div class="q-top">' +
         '<span class="q-id">' + esc(q.question_id || 'Q?') + '</span>' +
         '<span class="q-text">' + esc(q.question_text || '') + '</span>' +
-        '<span class="q-marks">' + qm + ' / ' + qx + '</span></div>' +
+        (isOpt ? '<span class="badge badge-amber" style="font-size:10px;padding:2px 6px;margin-right:6px;">Optional · Excluded from total</span>' : '') +
+        '<span class="q-marks" style="' + (isOpt ? 'text-decoration:line-through;opacity:0.6;' : '') + '">' + qm + ' / ' + qx + '</span></div>' +
         '<div class="meter" role="img" aria-label="' + esc(q.question_id || 'Question') + ': ' + qm + ' of ' + qx + ' marks">' +
-        '<i style="width:' + qp.toFixed(0) + '%;background:' + pctColor(qp) + '"></i></div>' +
+        '<i style="width:' + qp.toFixed(0) + '%;background:' + (isOpt ? '#dd5b00' : pctColor(qp)) + '"></i></div>' +
         '<div class="q-sub"><span>Confidence ' + Math.round((q.confidence ?? 0) * 100) + '%</span>' + crits + '</div>' +
         (q.feedback ? '<p class="q-feedback">' + esc(q.feedback) + '</p>' : '') + '</article>';
     }).join('') : '<p class="helper" style="padding:4px 0;">No per-question breakdown for this paper.</p>';

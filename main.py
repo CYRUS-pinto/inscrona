@@ -345,6 +345,48 @@ def get_result(job_id: str):
             data.get("question_grades", []),
             image_path=img_path
         )
+
+    # Dynamic Choice Rule & Academic Marks Consistency
+    qs = data.get("question_grades", [])
+    if len(qs) >= 2:
+        sum_awarded = sum(q.get("marks_awarded", 0) for q in qs)
+        sum_max = sum(q.get("max_marks", 0) for q in qs)
+        sorted_qs = sorted(qs, key=lambda q: q.get("marks_awarded", 0), reverse=True)
+        
+        # Best N calculation (e.g. Best 2 of 3)
+        best_count = max(1, len(qs) - 1)
+        best_n = sorted_qs[:best_count]
+        best_n_awarded = sum(q.get("marks_awarded", 0) for q in best_n)
+        best_n_max = sum(q.get("max_marks", 0) for q in best_n)
+        opt_qids = [q.get("question_id") for q in sorted_qs[best_count:]]
+
+        def _fmt(val):
+            return int(val) if isinstance(val, (int, float)) and float(val).is_integer() else round(val, 1)
+
+        data["choice_options"] = {
+            f"best_{best_count}_of_{len(qs)}": {
+                "total_marks": best_n_awarded,
+                "max_total_marks": best_n_max,
+                "percentage": round(100.0 * best_n_awarded / best_n_max, 1) if best_n_max > 0 else 0,
+                "label": f"Best {best_count} of {len(qs)} (Optional {', '.join(opt_qids)}) · {_fmt(best_n_awarded)}/{_fmt(best_n_max)} ({round(100*best_n_awarded/best_n_max, 1)}%)",
+                "optional_qids": opt_qids
+            },
+            "all_compulsory": {
+                "total_marks": sum_awarded,
+                "max_total_marks": sum_max,
+                "percentage": round(100.0 * sum_awarded / sum_max, 1) if sum_max > 0 else 0,
+                "label": f"All {len(qs)} Compulsory · {_fmt(sum_awarded)}/{_fmt(sum_max)} ({round(100*sum_awarded/sum_max, 1)}%)",
+                "optional_qids": []
+            }
+        }
+
+        # Auto-correct broken total/max marks (e.g. 20/20 when Q2=8, Q3=2)
+        if data.get("total_marks") == 20.0 and data.get("max_total_marks") == 20.0 and sum_max > 20:
+            data["total_marks"] = best_n_awarded
+            data["max_total_marks"] = best_n_max
+            data["percentage"] = round(100.0 * best_n_awarded / best_n_max, 1)
+            data["choice_rule"] = f"best_{best_count}_of_{len(qs)}"
+
     return data
 
 
