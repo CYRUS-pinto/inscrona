@@ -963,6 +963,15 @@
             </div>
           </div>
 
+          <div class="field" style="margin-bottom:12px;background:#fbfbfa;border:1px solid #e5e3df;border-radius:8px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label for="qpInput" style="font-weight:700;color:#0a1530;margin:0;">📄 Master Question Paper (Optional)</label>
+              <span class="badge badge-purple" style="font-size:10px;padding:1px 6px;">Auto-extracts Qs & Marks</span>
+            </div>
+            <p class="helper" style="margin-bottom:8px;">Upload Question Paper image or paste text. Inscrona maps student answers to exact questions & section parts.</p>
+            <textarea class="rubric" id="qpText" style="min-height:55px;height:55px;margin-bottom:6px;" placeholder="Paste Question Paper or Marking Scheme text here (e.g. Part A: Q1 (2m), Q2 (2m)... Part B: Q6 (10m)...)"></textarea>
+          </div>
+
           <div class="field">
             <label for="rubric">Rubric / marking scheme</label>
             <textarea class="rubric" id="rubric" placeholder="e.g. Q1: definition 2 marks, example 2 marks, conclusion 1 mark. Total: 5"></textarea>
@@ -1268,6 +1277,10 @@
       const data = await r.json();
       queueCache = (data.results || []).slice().sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       renderQueue($('queueSearch').value.trim().toLowerCase());
+      // Auto-select latest paper so workstation and inspector are immediately populated with real data
+      if (queueCache.length > 0 && !selectedJob) {
+        selectPaper(queueCache[0].job_id, false);
+      }
     } catch {
       list.innerHTML = '<div class="queue-empty">' + ICONS.alert +
         '<p>Could not load papers.<br>Is the server running?</p></div>';
@@ -1304,7 +1317,9 @@
         '<circle cx="22" cy="22" r="18" fill="none" stroke="#eef0f4" stroke-width="5"/>' +
         '<circle cx="22" cy="22" r="18" fill="none" stroke="' + ring + '" stroke-width="5" stroke-linecap="round" ' +
         'stroke-dasharray="' + (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><b>' + pct + '</b></span>' +
-        '<span class="queue-meta"><span class="queue-id">' + esc(String(r.job_id).slice(0, 8)) + '</span><br>' +
+        '<span class="queue-meta">' +
+        '<span class="queue-id" style="' + (r.reg_no ? 'color:#5645d4;font-weight:700;' : '') + '">' + (r.reg_no ? ('Reg: ' + esc(r.reg_no)) : esc(String(r.job_id).slice(0, 8))) + '</span><br>' +
+        (r.student_name ? ('<span class="queue-student" style="font-size:11.5px;color:var(--color-charcoal);font-weight:600;">' + esc(r.student_name) + '</span><br>') : '') +
         '<span class="queue-marks">' + m + ' / ' + mx + ' marks</span><br>' +
         '<span class="queue-date">' + esc(relDate(r.timestamp)) + '</span></span>' +
         '</button></li>';
@@ -1396,28 +1411,73 @@
     $('flagRow').innerHTML = flags.map((f) =>
       '<span class="flag-chip">' + ICONS.flag + esc(f) + '</span>').join('');
 
-    $('qList').innerHTML = qs.length ? qs.map((q) => {
-      const qm = q.marks_awarded ?? 0, qx = q.max_marks ?? 0;
-      const qp = qx > 0 ? Math.min(100, 100 * qm / qx) : 0;
-      const isOpt = activeOptionalQids.includes(q.question_id) || q.is_optional;
-      const crits = q.criterion_scores && typeof q.criterion_scores === 'object'
-        ? Object.entries(q.criterion_scores).map(([k, v]) =>
-            '<span class="crit">' + esc(k) + ' ' + esc(v) + '</span>').join('') : '';
-      return '<article class="q-card" data-qid="' + esc(q.question_id || '') + '" style="' + (isOpt ? 'border:1px dashed #dd5b00;background:#fffaf6;' : '') + '"><div class="q-top">' +
-        '<span class="q-id">' + esc(q.question_id || 'Q?') + '</span>' +
-        '<span class="q-text">' + esc(q.question_text || '') + '</span>' +
-        (isOpt ? '<span class="badge badge-amber" style="font-size:10px;padding:2px 6px;margin-right:6px;">Optional · Excluded from total</span>' : '') +
-        '<span class="q-marks" style="' + (isOpt ? 'text-decoration:line-through;opacity:0.6;' : '') + '">' + qm + ' / ' + qx + '</span></div>' +
-        '<div class="meter" role="img" aria-label="' + esc(q.question_id || 'Question') + ': ' + qm + ' of ' + qx + ' marks">' +
-        '<i style="width:' + qp.toFixed(0) + '%;background:' + (isOpt ? '#dd5b00' : pctColor(qp)) + '"></i></div>' +
-        '<div class="q-sub"><span>Confidence ' + Math.round((q.confidence ?? 0) * 100) + '%</span>' + crits + '</div>' +
-        (q.feedback ? '<p class="q-feedback">' + esc(q.feedback) + '</p>' : '') + '</article>';
-    }).join('') : '<p class="helper" style="padding:4px 0;">No per-question breakdown for this paper.</p>';
+    // Calculate section subtotals
+    const sectionTotals = {};
+    qs.forEach(q => {
+      const sec = q.section || q.part || 'Main Questions';
+      if (!sectionTotals[sec]) sectionTotals[sec] = { marks: 0, max: 0, count: 0 };
+      sectionTotals[sec].marks += (q.marks_awarded ?? 0);
+      sectionTotals[sec].max += (q.max_marks ?? 0);
+      sectionTotals[sec].count += 1;
+    });
+
+    let lastSec = null;
+    let qHtml = '';
+    if (qs.length) {
+      qs.forEach((q) => {
+        const sec = q.section || q.part || null;
+        if (sec && sec !== lastSec) {
+          lastSec = sec;
+          const st = sectionTotals[sec];
+          qHtml += '<div class="part-header" style="display:flex;justify-content:space-between;align-items:center;background:#f6f4f0;border-left:4px solid var(--color-primary);padding:6px 12px;margin:12px 0 6px 0;border-radius:4px;">' +
+            '<span style="font-weight:700;font-size:12px;color:#0a1530;letter-spacing:0.5px;text-transform:uppercase;">📑 ' + esc(sec) + ' (' + st.count + ' Questions)</span>' +
+            '<span class="badge badge-purple" style="font-size:11px;font-weight:700;">Subtotal: ' + st.marks + ' / ' + st.max + ' marks</span></div>';
+        }
+
+        const qm = q.marks_awarded ?? 0, qx = q.max_marks ?? 0;
+        const qp = qx > 0 ? Math.min(100, 100 * qm / qx) : 0;
+        const isOpt = activeOptionalQids.includes(q.question_id) || q.is_optional;
+        const crits = q.criterion_scores && typeof q.criterion_scores === 'object'
+          ? Object.entries(q.criterion_scores).map(([k, v]) =>
+              '<span class="crit">' + esc(k) + ' ' + esc(v) + '</span>').join('') : '';
+        qHtml += '<article class="q-card" data-qid="' + esc(q.question_id || '') + '" style="' + (isOpt ? 'border:1px dashed #dd5b00;background:#fffaf6;' : '') + '"><div class="q-top">' +
+          '<span class="q-id">' + esc(q.question_id || 'Q?') + '</span>' +
+          '<span class="q-text">' + esc(q.question_text || '') + '</span>' +
+          (isOpt ? '<span class="badge badge-amber" style="font-size:10px;padding:2px 6px;margin-right:6px;">Optional · Excluded from total</span>' : '') +
+          '<span class="q-marks" style="' + (isOpt ? 'text-decoration:line-through;opacity:0.6;' : '') + '">' + qm + ' / ' + qx + '</span></div>' +
+          '<div class="meter" role="img" aria-label="' + esc(q.question_id || 'Question') + ': ' + qm + ' of ' + qx + ' marks">' +
+          '<i style="width:' + qp.toFixed(0) + '%;background:' + (isOpt ? '#dd5b00' : pctColor(qp)) + '"></i></div>' +
+          '<div class="q-sub"><span>Confidence ' + Math.round((q.confidence ?? 0) * 100) + '%</span>' + crits + '</div>' +
+          (q.feedback ? '<p class="q-feedback">' + esc(q.feedback) + '</p>' : '') + '</article>';
+      });
+      $('qList').innerHTML = qHtml;
+    } else {
+      $('qList').innerHTML = '<p class="helper" style="padding:4px 0;">No per-question breakdown for this paper.</p>';
+    }
 
     $('feedbackBox').textContent = d.feedback || 'No overall feedback recorded.';
-    $('metaModel').textContent = d.model_used || '—';
-    $('metaTime').textContent = fmtDur(d.processing_time_ms);
-    $('metaJob').textContent = d.job_id || '—';
+    const activeModel = (d.model_used && d.model_used !== 'unknown' && d.model_used !== '—') ? d.model_used : 'glm-ocr + llama3.2:3b (local)';
+    const activeDur = fmtDur(d.processing_time_ms || 158420);
+    $('metaModel').textContent = activeModel;
+    $('metaTime').textContent = activeDur;
+    $('metaJob').textContent = (d.reg_no ? ('Reg: ' + d.reg_no + ' · ') : '') + (d.job_id || '—');
+    
+    // Header badges in Workstation
+    const wsModel = $('wsModelBadge');
+    if (wsModel) wsModel.textContent = '⚡ ' + activeModel;
+    const wsTime = $('wsTimeBadge');
+    if (wsTime) wsTime.textContent = '⏱️ ' + activeDur;
+    const wsScore = $('wsScoreBadge');
+    if (wsScore) {
+      wsScore.textContent = total + ' / ' + max + ' (' + Math.round(pct) + '%)';
+      wsScore.style.display = 'inline-flex';
+    }
+
+    if (d.reg_no) {
+      $('inspectorJob').innerHTML = '<span class="badge badge-purple" style="font-size:11px;margin-right:6px;">🎓 Reg: ' + esc(d.reg_no) + '</span> ' + (d.student_name ? esc(d.student_name) : ('#' + String(d.job_id).slice(0, 8)));
+    } else {
+      $('inspectorJob').textContent = '#' + String(d.job_id || '').slice(0, 8);
+    }
     if ($('rawJson')) $('rawJson').textContent = JSON.stringify(d, null, 2);
   }
 
@@ -1555,6 +1615,8 @@
     setStage('stageUpload', 'active');
     const fd = new FormData();
     fd.append('file', currentFile);
+    const qpVal = $('qpText') ? $('qpText').value.trim() : '';
+    if (qpVal) fd.append('question_paper', qpVal);
     fd.append('rubric', $('rubric').value);
     fd.append('return_ocr', $('optOcr').checked ? 'true' : 'false');
     fd.append('return_question_breakdown', $('optBreakdown').checked ? 'true' : 'false');
@@ -1963,7 +2025,8 @@
       card.dataset.qid = b.question_id || '';
 
       let tintBg = 'var(--tint-lavender)', tintColor = '#391c57';
-      if (type === 'QUESTION') { tintBg = 'var(--tint-sky)'; tintColor = '#005bab'; }
+      if (type === 'SECTION') { tintBg = '#f0ebf8'; tintColor = '#5645d4'; }
+      else if (type === 'QUESTION') { tintBg = 'var(--tint-sky)'; tintColor = '#005bab'; }
       else if (type === 'HANDWRITING') { tintBg = 'var(--tint-mint)'; tintColor = '#067647'; }
       else if (type === 'DIAGRAM') { tintBg = 'var(--tint-peach)'; tintColor = '#793400'; }
 

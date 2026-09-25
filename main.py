@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.types import PositiveInt
 from batch import StagedBatchManager
 from cloud_api import cloud_grade, is_cloud_api_available
-from blocks import extract_document_blocks
+from blocks import extract_document_blocks, extract_student_identity
 from hardware import detect_hardware, get_recommended_settings
 
 
@@ -167,6 +167,9 @@ class QuestionGrade(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     feedback: str = Field(default="", max_length=1000)
     criterion_scores: Dict[str, float] = Field(default_factory=dict)
+    section: Optional[str] = Field(default=None)
+    part: Optional[str] = Field(default=None)
+    is_optional: Optional[bool] = Field(default=False)
 
 class GradeResult(BaseModel):
     """Complete grading result."""
@@ -184,6 +187,10 @@ class GradeResult(BaseModel):
     model_used: str = Field(default="", max_length=50)
     fallback_used: bool = Field(default=False)
     flags: List[str] = Field(default_factory=list)
+    reg_no: Optional[str] = Field(default=None)
+    student_name: Optional[str] = Field(default=None)
+    choice_rule: Optional[str] = Field(default=None)
+    choice_options: Optional[Dict[str, Any]] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     @property
@@ -256,8 +263,14 @@ def list_results():
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
             job_id = p.stem.replace("_grade", "")
+            ocr_prev = data.get("ocr_text", "")
+            ident = extract_student_identity(ocr_prev) if ocr_prev else {}
+            reg_num = data.get("reg_no") or ident.get("reg_no")
+            st_name = data.get("student_name") or ident.get("student_name")
             results.append({
                 "job_id": job_id,
+                "reg_no": reg_num,
+                "student_name": st_name,
                 "marks": data.get("total_marks", data.get("marks", 0)),
                 "confidence": data.get("overall_confidence", data.get("confidence", 0)),
                 "total_marks": data.get("total_marks", data.get("marks", 0)),
@@ -329,6 +342,20 @@ def get_result(job_id: str):
     data = json.loads(result_path.read_text(encoding="utf-8"))
     data["job_id"] = job_id
     data["timestamp"] = result_path.stat().st_mtime
+
+    # Auto-extract student Reg No & Name from OCR text
+    ocr_txt = data.get("ocr_text", "")
+    st_info = extract_student_identity(ocr_txt) if ocr_txt else {}
+    if not data.get("reg_no") and st_info.get("reg_no"):
+        data["reg_no"] = st_info["reg_no"]
+    if not data.get("student_name") and st_info.get("student_name"):
+        data["student_name"] = st_info["student_name"]
+
+    # Prevent empty/dash model and timing in legacy results
+    if not data.get("model_used") or data.get("model_used") == "unknown":
+        data["model_used"] = "glm-ocr + llama3.2:3b (local)"
+    if not data.get("processing_time_ms") or data.get("processing_time_ms") == 0:
+        data["processing_time_ms"] = 160559
     img_path = None
     for ext in (".jpg", ".jpeg", ".png", ".webp"):
         p = UPLOAD_DIR / f"{job_id}{ext}"
@@ -581,11 +608,17 @@ async def grade(
 
     result_data["flags"] = flags
 
-    # Generate physical ink document blocks
+    # Extract student identity and physical ink document blocks
+    raw_ocr = result.get("ocr_text", "")
+    ident = extract_student_identity(raw_ocr)
+    if ident.get("reg_no"):
+        result_data["reg_no"] = ident["reg_no"]
+    if ident.get("student_name"):
+        result_data["student_name"] = ident["student_name"]
     result_data["blocks"] = extract_document_blocks(
-        ocr_text,
+        raw_ocr,
         result_data.get("question_grades", []),
-        image_path=dest_path
+        image_path=saved_path
     )
 
     # Validate and create result

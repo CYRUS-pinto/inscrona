@@ -132,21 +132,34 @@ def extract_document_blocks(
         else:
             break
 
-    # 2. Parse Remaining Text into Question and Answer Sections
+    # 2. Parse Remaining Text into Question, Section, and Answer Blocks
+    part_pattern = re.compile(r"^(?:(?:[IVXLCDM]+\.?\s*)?(?:PART|SECTION)\s*[-–—:]?\s*([A-Za-z0-9]+))", re.IGNORECASE)
     q_pattern = re.compile(r"^(?:Q(?:uestion)?\s*(\d+[a-zA-Z]?)|(\d+)[\.\)])\s*[:\.]?", re.IGNORECASE)
     sections = []
     if header_lines:
-        sections.append(("HEADER", "\n".join(header_lines)))
+        sections.append(("HEADER", "\n".join(header_lines), None))
 
     current_qid = None
     current_q_text = []
+    current_section = None
     remaining_lines = lines[curr_idx:] if curr_idx < len(lines) else []
 
     for line in remaining_lines:
+        pm = part_pattern.match(line)
+        if pm:
+            if current_qid is not None or current_q_text:
+                sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text), current_section))
+                current_qid = None
+                current_q_text = []
+            part_letter = pm.group(1).upper()
+            current_section = f"Part {part_letter}"
+            sections.append(("SECTION", line, current_section))
+            continue
+
         m = q_pattern.match(line)
         if m:
             if current_qid is not None or current_q_text:
-                sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text)))
+                sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text), current_section))
             num = m.group(1) or m.group(2)
             current_qid = f"Q{num.upper()}"
             current_q_text = [line]
@@ -154,10 +167,10 @@ def extract_document_blocks(
             current_q_text.append(line)
 
     if current_q_text:
-        sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text)))
+        sections.append((current_qid or "HANDWRITING", "\n".join(current_q_text), current_section))
 
     if not sections and remaining_lines:
-        sections = [("Q1", "\n".join(remaining_lines))]
+        sections = [("Q1", "\n".join(remaining_lines), None)]
 
     # 3. Coordinate Generation: Physical Ink Detection vs Proportional Content-Derivation
     physical_boxes = detect_physical_ink_boxes(image_path) if image_path else []
@@ -167,7 +180,7 @@ def extract_document_blocks(
     if physical_boxes:
         M = len(sections)
         N = len(physical_boxes)
-        weights = [max(1, len(txt.splitlines())) * (max(1, len(txt)) ** 0.5) for _, txt in sections]
+        weights = [max(1, len(txt.splitlines())) * (max(1, len(txt)) ** 0.5) for _, txt, _ in sections]
         total_w = sum(weights) or 1.0
 
         assigned_boxes = []
@@ -198,7 +211,7 @@ def extract_document_blocks(
                 b_idx = min(N - 1, int(i * N / M))
                 assigned_boxes.append(list(physical_boxes[b_idx]))
 
-        for i, (sec_type, text) in enumerate(sections):
+        for i, (sec_type, text, sec_part) in enumerate(sections):
             box = assigned_boxes[i]
             is_header = sec_type == "HEADER"
             qid = sec_type if (sec_type.startswith("Q") or sec_type.startswith("q")) else None
@@ -210,7 +223,8 @@ def extract_document_blocks(
             blocks.append({
                 "id": f"block_{qid or ('header' if is_header else f'body_{i}')}",
                 "type": block_type,
-                "tag": "PageHeader" if is_header else ("Question" if qid else "Handwriting"),
+                "tag": "PageHeader" if is_header else (sec_part or "Section") if sec_type == "SECTION" else ("Question" if qid else "Handwriting"),
+                "section": sec_part,
                 "question_id": qid,
                 "text": text,
                 "box_2d": list(box),
@@ -221,11 +235,11 @@ def extract_document_blocks(
             })
     else:
         # Ground coordinates in content line counts and character density (not uniform slices)
-        total_chars = sum(len(text) for _, text in sections) or 1
+        total_chars = sum(len(text) for _, text, _ in sections) or 1
         curr_y = 30
         available_y = 920
 
-        for i, (sec_type, text) in enumerate(sections):
+        for i, (sec_type, text, sec_part) in enumerate(sections):
             is_header = sec_type == "HEADER"
             qid = sec_type if (sec_type.startswith("Q") or sec_type.startswith("q")) else None
             has_diagram = "[diagram" in text.lower() or "graph" in text.lower() or "circuit" in text.lower()
@@ -248,7 +262,8 @@ def extract_document_blocks(
             blocks.append({
                 "id": f"block_{qid or ('header' if is_header else f'body_{i}')}",
                 "type": block_type,
-                "tag": "PageHeader" if is_header else ("Question" if qid else "Handwriting"),
+                "tag": "PageHeader" if is_header else (sec_part or "Section") if sec_type == "SECTION" else ("Question" if qid else "Handwriting"),
+                "section": sec_part,
                 "question_id": qid,
                 "text": text,
                 "box_2d": [ymin, 45, ymax, xmax],
@@ -259,3 +274,44 @@ def extract_document_blocks(
             })
 
     return blocks
+
+
+def extract_student_identity(ocr_text: str) -> Dict[str, Optional[str]]:
+    """Extracts student Registration Number, Name, Course, Program, and Semester."""
+    if not ocr_text:
+        return {"reg_no": None, "student_name": None, "course": None, "subject": None, "program": None, "semester": None}
+
+    # 1. Reg / Roll / USN
+    reg_m = re.search(r"(?:Registration\s*No\.?|Reg\.?\s*No\.?|Roll\s*No\.?|USN|Student\s*ID)[:\-\.\s]*([A-Za-z0-9\-]+)", ocr_text, re.I)
+    
+    # 2. Student Name
+    name_m = re.search(r"(?:Name\s*of\s*(?:the\s*)?Candidate|Student\s*Name|Name)[:\-\.\s]*([A-Za-z\s\.]+?)(?:[\r\n]|Program|Roll|Reg|Course|Semester|$)", ocr_text, re.I)
+    
+    # 3. Course / Subject
+    course_m = re.search(r"(?:Title\s*of\s*the\s*Course|Course\s*Title|Course|Subject)[:\-\.\s]*([A-Za-z0-9\s]+?)(?:[\r\n]|Code|Name|Date|Max|$)", ocr_text, re.I)
+    
+    # 4. Program / Branch
+    prog_m = re.search(r"(?:Program|Department|Branch)[:\-\.\s]*([A-Za-z0-9\s\(\)]+?)(?:[\r\n]|Semester|Course|$)", ocr_text, re.I)
+
+    # 5. Semester
+    sem_m = re.search(r"(?:Semester|Sem)[:\-\.\s]*([A-Za-z0-9\s]+?)(?:[\r\n]|Course|Date|$)", ocr_text, re.I)
+
+    reg = reg_m.group(1).strip() if reg_m else None
+    name = name_m.group(1).strip() if name_m else None
+    course = course_m.group(1).strip() if course_m else None
+    prog = prog_m.group(1).strip() if prog_m else None
+    sem = sem_m.group(1).strip() if sem_m else None
+
+    if reg and (len(reg) < 3 or reg.lower() in ("and", "the", "page", "test", "none")):
+        reg = None
+    if name and ("university" in name.lower() or "school" in name.lower() or "faculty" in name.lower() or len(name) < 2):
+        name = None
+
+    return {
+        "reg_no": reg,
+        "student_name": name,
+        "course": course,
+        "subject": course,
+        "program": prog,
+        "semester": sem
+    }
