@@ -28,6 +28,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
 from pydantic.types import PositiveInt
+from batch import StagedBatchManager
+from cloud_api import cloud_grade, is_cloud_api_available
 
 
 def _load_dotenv(path: str = ".env") -> None:
@@ -206,6 +208,8 @@ class GradeRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="Inscrona", version="0.1.0")
+batch_mgr = StagedBatchManager(db_path="database.db")
+
 
 
 @app.get("/health")
@@ -214,6 +218,7 @@ def health():
         "status": "ok",
         "mode": _current_mode(),
         "colab_circuit_open": _colab_breaker["state"] == "OPEN",
+        "cloud_api_available": is_cloud_api_available(),
     }
 
 
@@ -513,6 +518,229 @@ async def grade(
 
     return final_result
 
+
+
+# ---------------------------------------------------------------------------
+# Staged Batch & Decoupled Re-Grading Pipeline
+# ---------------------------------------------------------------------------
+
+async def _process_phase2_grading(batch_id: str, rubric: str):
+    await batch_mgr.set_batch_phase(batch_id, 2, "phase2_grading")
+    status = await batch_mgr.get_status(batch_id)
+    papers = status["papers"]
+    logger.info(f"[batch {batch_id}] Phase 2: Bulk evaluation starting for {len(papers)} papers")
+    
+    for p in papers:
+        jid = p["job_id"]
+        ocr_text = p.get("ocr_text", "")
+        if not ocr_text:
+            continue
+        try:
+            grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
+            grade_raw = await asyncio.to_thread(
+                _ollama_generate, "llama3.2:3b", grade_prompt,
+                keep_alive=300, format_json=True, num_ctx=4096,
+                num_predict=GRADE_NUM_PREDICT
+            )
+            cleaned = grade_raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = "\n".join([l for l in cleaned.split("\n") if not l.startswith("```")])
+            try:
+                parsed = json.loads(cleaned)
+            except Exception:
+                repaired = cleaned
+                repaired = re.sub(r'("[^"\n]*")\s*\n\s*("([a-zA-Z0-9_]+)"\s*:)', r'\1,\n\2', repaired)
+                repaired = re.sub(r'([\d\.]+|true|false)\s*\n\s*("[\w_]+"\s*:)', r'\1,\n\2', repaired)
+                repaired = re.sub(r',\s*([\}\]])', r'\1', repaired)
+                parsed = json.loads(repaired)
+            
+            marks = float(parsed.get("total_marks", 0))
+            max_marks = float(parsed.get("max_total_marks", 10))
+            conf = float(parsed.get("overall_confidence", 0.8))
+            feedback = parsed.get("feedback", "")
+            await batch_mgr.update_paper_grade(jid, marks, max_marks, conf, feedback)
+        except Exception as e:
+            logger.error(f"[batch {batch_id}] Grading failed for {jid}: {e}")
+            await batch_mgr.update_paper_grade(jid, 0, 10, 0.0, f"Grading error: {e}", error=str(e))
+
+    try:
+        await asyncio.to_thread(_ollama_generate, "llama3.2:3b", "", keep_alive=0)
+    except Exception:
+        pass
+    
+    await batch_mgr.set_batch_phase(batch_id, 2, "completed")
+    logger.info(f"[batch {batch_id}] Phase 2 grading completed")
+
+
+async def _process_staged_batch(batch_id: str, rubric: str, engine: str):
+    logger.info(f"[batch {batch_id}] Executing batch with engine={engine}")
+    status = await batch_mgr.get_status(batch_id)
+    papers = status["papers"]
+
+    # 1. Cloud Flash API Tier
+    if engine == "cloud_flash" or (engine == "auto" and is_cloud_api_available()):
+        logger.info(f"[batch {batch_id}] Processing via Cloud Flash API")
+        await batch_mgr.set_batch_phase(batch_id, 1, "processing_cloud")
+        for p in papers:
+            jid = p["job_id"]
+            img_path = p.get("file_path")
+            try:
+                raw_bytes = Path(img_path).read_bytes()
+                res = await cloud_grade(raw_bytes, rubric)
+                await batch_mgr.update_paper_ocr(jid, res.get("ocr_text", ""))
+                await batch_mgr.update_paper_grade(
+                    jid,
+                    marks=res["total_marks"],
+                    max_marks=res["max_total_marks"],
+                    confidence=res["confidence"],
+                    feedback=res["feedback"]
+                )
+            except Exception as e:
+                logger.error(f"[batch {batch_id}] Paper {jid} failed on Cloud API: {e}")
+                await batch_mgr.update_paper_grade(jid, 0, 10, 0.0, f"Cloud API error: {e}", error=str(e))
+        await batch_mgr.set_batch_phase(batch_id, 2, "completed")
+        return
+
+    # 2. Remote Colab T4 Burst Tier
+    if engine == "colab_burst" or (engine == "auto" and COLAB_INFERENCE_URL and await _colab_healthy()):
+        logger.info(f"[batch {batch_id}] Processing via Colab T4 Burst backend")
+        await batch_mgr.set_batch_phase(batch_id, 1, "processing_colab")
+        for p in papers:
+            jid = p["job_id"]
+            img_path = p.get("file_path")
+            try:
+                raw_bytes = Path(img_path).read_bytes()
+                b64 = base64.b64encode(raw_bytes).decode()
+                res = await _colab_grade_endpoint(b64, rubric)
+                norm = await _normalize_colab_result(res)
+                await batch_mgr.update_paper_ocr(jid, norm.get("ocr_text", ""))
+                await batch_mgr.update_paper_grade(
+                    jid,
+                    marks=norm.get("total_marks", 0),
+                    max_marks=norm.get("max_total_marks", 10),
+                    confidence=norm.get("overall_confidence", 0.8),
+                    feedback=norm.get("feedback", "")
+                )
+            except Exception as e:
+                logger.error(f"[batch {batch_id}] Paper {jid} failed on Colab: {e}")
+                await batch_mgr.update_paper_grade(jid, 0, 10, 0.0, f"Colab error: {e}", error=str(e))
+        await _colab_unload_models()
+        await batch_mgr.set_batch_phase(batch_id, 2, "completed")
+        return
+
+    # 3. Two-Phase Staged Local Pipeline (Zero VRAM Thrashing on <=6GB laptops)
+    logger.info(f"[batch {batch_id}] Processing via Staged Local Pipeline")
+    await batch_mgr.set_batch_phase(batch_id, 1, "phase1_ocr")
+    for p in papers:
+        jid = p["job_id"]
+        img_path = p.get("file_path")
+        try:
+            raw_bytes = Path(img_path).read_bytes()
+            b64 = base64.b64encode(raw_bytes).decode()
+            ocr_text = await asyncio.to_thread(
+                _ollama_generate, "glm-ocr", _ocr_prompt(),
+                images=[b64], keep_alive=300, num_ctx=8192
+            )
+            await batch_mgr.update_paper_ocr(jid, ocr_text)
+        except Exception as e:
+            logger.error(f"[batch {batch_id}] Local OCR failed for {jid}: {e}")
+            await batch_mgr.update_paper_ocr(jid, "", error=str(e))
+
+    try:
+        await asyncio.to_thread(_ollama_generate, "glm-ocr", "", keep_alive=0)
+    except Exception:
+        pass
+
+    await _process_phase2_grading(batch_id, rubric)
+
+
+@app.post("/grade/batch")
+async def create_batch_grade(
+    files: List[UploadFile] = File(...),
+    rubric: str = Form(default="Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity."),
+    engine: str = Form(default="auto"),
+):
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    batch_items = []
+    for f in files:
+        raw_bytes = await f.read()
+        if not raw_bytes:
+            continue
+        jid = uuid.uuid4().hex[:12]
+        ext = Path(f.filename or "upload.jpg").suffix.lower()
+        if ext not in {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'}:
+            ext = '.jpg'
+        saved_path = UPLOAD_DIR / f"{jid}{ext}"
+        saved_path.write_bytes(raw_bytes)
+
+        try:
+            img = Image.open(saved_path)
+            w, h = img.size
+            if max(w, h) > 1400:
+                scale = 1400.0 / max(w, h)
+                new_size = (int(w * scale), int(h * scale))
+                img = img.resize(new_size, Image.LANCZOS)
+                jpeg_path = UPLOAD_DIR / f"{jid}.jpg"
+                img.save(jpeg_path, "JPEG", quality=85, optimize=True)
+                if saved_path != jpeg_path and saved_path.exists():
+                    saved_path.unlink()
+                saved_path = jpeg_path
+        except Exception as e:
+            logger.warning(f"Image preprocessing warning for {f.filename}: {e}")
+
+        batch_items.append({
+            "job_id": jid,
+            "filename": f.filename or f"{jid}.jpg",
+            "file_path": str(saved_path)
+        })
+
+    if not batch_items:
+        raise HTTPException(status_code=400, detail="No valid image files uploaded")
+
+    batch_id = await batch_mgr.create_batch(batch_items, rubric=rubric, engine=engine)
+    asyncio.create_task(_process_staged_batch(batch_id, rubric, engine))
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "batch_id": batch_id,
+            "total_papers": len(batch_items),
+            "engine": engine,
+            "status": "queued",
+            "message": "Batch accepted and processing in background"
+        }
+    )
+
+
+@app.get("/grade/batch/{batch_id}")
+async def get_batch_status(batch_id: str):
+    try:
+        return await batch_mgr.get_status(batch_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/grade/batch/{batch_id}/regrade")
+async def regrade_batch(
+    batch_id: str,
+    rubric: str = Form(...)
+):
+    try:
+        await batch_mgr.reset_batch_for_regrade(batch_id, rubric)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    asyncio.create_task(_process_phase2_grading(batch_id, rubric))
+    return JSONResponse(
+        status_code=202,
+        content={
+            "batch_id": batch_id,
+            "status": "phase2_grading",
+            "message": "Re-grading started using cached OCR transcripts"
+        }
+    )
 
 # ---------------------------------------------------------------------------
 # Pairing & Mobile API
