@@ -37,7 +37,7 @@ def _load_dotenv(path: str = ".env") -> None:
     quotes. Never overrides variables already present in the environment.
     """
     try:
-        text = Path(path).read_text(encoding="utf-8")
+        text = Path(path).read_text(encoding="utf-8").lstrip("\ufeff")
     except OSError:
         return
     for line in text.splitlines():
