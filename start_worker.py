@@ -208,10 +208,10 @@ Respond ONLY with valid JSON matching:
     return app
 
 def start_tunnel(tunnel_type: str, port: int) -> str:
-    """Start Pinggy or Cloudflare tunnel and return public URL."""
-    # 1. Try Cloudflare if requested or default
-    if tunnel_type == "cloudflare":
-        log("Setting up Cloudflare tunnel...")
+    """Start Cloudflare or Pinggy tunnel and return public URL."""
+    # Cloudflare is default and fastest on Colab (installs in 2s, stable URL)
+    if tunnel_type == "cloudflare" or tunnel_type != "pinggy":
+        log("Setting up Cloudflare tunnel (fast, zero sign-up)...")
         if shutil.which("cloudflared") is None:
             log("Installing cloudflared...")
             subprocess.run("wget -q -nc https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1", shell=True)
@@ -220,48 +220,44 @@ def start_tunnel(tunnel_type: str, port: int) -> str:
             ["cloudflared", "tunnel", "--url", f"http://localhost:{port}"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
-        for _ in range(25):
+        start_wait = time.time()
+        while time.time() - start_wait < 30:
             line = proc.stderr.readline()
+            if not line:
+                time.sleep(0.1)
+                continue
             m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
             if m:
-                return m.group(0)
-            time.sleep(0.5)
+                url = m.group(0)
+                log(f"Cloudflare tunnel established: {url}")
+                return url
+        log("Cloudflare tunnel timed out. Trying Pinggy...")
 
-    # 2. Try Pinggy (via native SSH which requires zero installs)
-    log("Setting up Pinggy tunnel via SSH...")
+    # Pinggy fallback
+    log("Setting up Pinggy tunnel...")
     try:
         cmd = f"ssh -p 443 -R0:localhost:{port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes a.pinggy.io"
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        for _ in range(25):
+        start_wait = time.time()
+        while time.time() - start_wait < 25:
             line = proc.stdout.readline()
-            m = re.search(r"https://[a-zA-Z0-9-]+\.(?:free|a)\.pinggy\.link", line)
+            if not line:
+                time.sleep(0.2)
+                continue
+            m = re.search(r"https?://[a-zA-Z0-9.-]+\.pinggy\.link", line)
             if m:
-                return m.group(0)
-            time.sleep(0.5)
+                url = m.group(0)
+                log(f"Pinggy tunnel established: {url}")
+                return url
     except Exception as e:
-        log(f"Pinggy SSH tunnel failed: {e}")
-
-    # Fallback to cloudflare if pinggy didn't produce URL
-    log("Falling back to Cloudflare tunnel...")
-    if shutil.which("cloudflared") is None:
-        subprocess.run("wget -q -nc https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && dpkg -i cloudflared-linux-amd64.deb >/dev/null 2>&1", shell=True)
-    proc = subprocess.Popen(
-        ["cloudflared", "tunnel", "--url", f"http://localhost:{port}"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    for _ in range(25):
-        line = proc.stderr.readline()
-        m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
-        if m:
-            return m.group(0)
-        time.sleep(0.5)
+        log(f"Pinggy failed: {e}")
 
     return ""
 
 def main():
     parser = argparse.ArgumentParser(description="Inscrona GPU Burst Worker")
     parser.add_argument("--port", type=int, default=8000, help="Local worker port")
-    parser.add_argument("--tunnel", type=str, choices=["pinggy", "cloudflare", "none"], default="pinggy", help="Tunnel provider")
+    parser.add_argument("--tunnel", type=str, choices=["cloudflare", "pinggy", "none"], default="cloudflare", help="Tunnel provider")
     args = parser.parse_args()
 
     log("="*60)
