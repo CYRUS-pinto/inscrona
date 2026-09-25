@@ -136,36 +136,80 @@ def create_app():
     async def grade_endpoint(
         file: UploadFile = File(...),
         rubric: str = Form(default="Evaluate answer accuracy and completeness."),
-        question_paper: str = Form(default="")
+        question_paper: str = Form(default=""),
+        question_paper_file: Optional[UploadFile] = File(default=None)
     ):
         start_t = time.perf_counter()
         raw_bytes = await file.read()
         if not raw_bytes:
             raise HTTPException(400, "Empty file uploaded")
 
-        # Process image
+        # 0. Optional Question Paper OCR if file provided
+        qp_text = question_paper or ""
+        if question_paper_file:
+            qp_bytes = await question_paper_file.read()
+            if qp_bytes:
+                try:
+                    qp_img = Image.open(io.BytesIO(qp_bytes))
+                    if max(qp_img.size) > 1024:
+                        qp_scale = 1024 / max(qp_img.size)
+                        qp_img = qp_img.resize((int(qp_img.width * qp_scale), int(qp_img.height * qp_scale)), Image.LANCZOS)
+                    qp_buf = io.BytesIO()
+                    qp_img.save(qp_buf, format="JPEG", quality=85)
+                    qp_b64 = base64.b64encode(qp_buf.getvalue()).decode()
+                    qp_ocr_resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
+                        "model": "glm-ocr",
+                        "prompt": "Extract all questions, parts, marks, and rubrics from this master question paper.",
+                        "images": [qp_b64],
+                        "stream": False,
+                        "options": {"num_ctx": 2048, "temperature": 0.0, "repeat_penalty": 1.15, "num_predict": 800, "stop": ["```\n```", "\n\n\n\n"]}
+                    }, timeout=120)
+                    qp_extracted = qp_ocr_resp.json().get("response", "").strip()
+                    if qp_extracted:
+                        qp_text = f"{qp_text}\n{qp_extracted}".strip()
+                except Exception as e:
+                    log(f"Question paper OCR extraction failed: {e}")
+
+        # 1. Process Student Answer image (1024 max edge = 1 single tile = 1.2s GPU pass)
         img = Image.open(io.BytesIO(raw_bytes))
-        if max(img.size) > 1600:
-            scale = 1600 / max(img.size)
+        if max(img.size) > 1024:
+            scale = 1024 / max(img.size)
             img = img.resize((int(img.width * scale), int(img.height * scale)), Image.LANCZOS)
 
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
         img_b64 = base64.b64encode(buf.getvalue()).decode()
 
-        # 1. Fast GPU OCR with GLM-OCR
+        # 2. Ultra-Fast GPU OCR with GLM-OCR (with anti-repetition penalty & stop tokens)
         ocr_prompt = "Extract all handwritten and printed text from this exam answer paper accurately. Preserve lines, question numbers, and parts."
         ocr_resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
             "model": "glm-ocr",
             "prompt": ocr_prompt,
             "images": [img_b64],
             "stream": False,
-            "options": {"num_ctx": 4096}
-        }, timeout=300)
+            "options": {
+                "num_ctx": 4096,
+                "temperature": 0.0,
+                "repeat_penalty": 1.15,
+                "num_predict": 1024,
+                "stop": ["```\n```", "\n\n\n\n", "```\n\n```", "<|endoftext|>"]
+            }
+        }, timeout=120)
         ocr_text = ocr_resp.json().get("response", "")
 
-        # 2. Fast GPU Evaluation with Llama 3.2:3b
-        qp_context = f"\nMASTER QUESTION PAPER & MARKING SCHEME:\n{question_paper}\n" if question_paper else ""
+        # Strip runaway loop backticks if any
+        if "```mark" in ocr_text:
+            first_part = ocr_text.split("```mark")[0].strip()
+            if len(first_part) > 60:
+                ocr_text = first_part
+        ocr_text = re.sub(r"(```\s*){3,}", "", ocr_text).strip()
+
+        # Extract student registration number if visible
+        reg_match = re.search(r"(?:Registration\s*No\.?|Reg\.?\s*No\.?|Roll\s*No\.?|USN|Student\s*ID)[:\-\.\s]*([A-Za-z0-9\-]+)", ocr_text, re.I)
+        student_reg = reg_match.group(1).strip() if reg_match else None
+
+        # 3. Fast GPU Evaluation with Llama 3.2:3b
+        qp_context = f"\nMASTER QUESTION PAPER & MARKING SCHEME:\n{qp_text}\n" if qp_text else ""
         grade_prompt = f"""You are an expert university exam grader. Grade the student answers against the rubric.{qp_context}
 
 STUDENT ANSWER:
@@ -176,10 +220,15 @@ RUBRIC:
 
 Respond ONLY with valid JSON matching:
 {{
-  "marks": <number 0-20>,
-  "confidence": <number 0.0-1.0>,
+  "total_marks": <number 0-20>,
+  "max_total_marks": <number e.g. 20>,
+  "percentage": <number 0-100>,
+  "overall_confidence": <number 0.0-1.0>,
+  "confidence_level": "<high|medium|low>",
   "feedback": "<concise evaluation>",
-  "question_grades": []
+  "question_grades": [
+     {{"question_id": "Q1", "marks_awarded": <number>, "max_marks": <number>, "confidence": <0.0-1.0>, "feedback": "<text>"}}
+  ]
 }}"""
 
         eval_resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
@@ -187,20 +236,21 @@ Respond ONLY with valid JSON matching:
             "prompt": grade_prompt,
             "format": "json",
             "stream": False,
-            "options": {"num_ctx": 4096, "temperature": 0.1}
+            "options": {"num_ctx": 4096, "temperature": 0.1, "num_predict": 1024}
         }, timeout=120)
 
         raw_eval = eval_resp.json().get("response", "{}")
         try:
-            # Strip markdown fence if present
             cleaned = raw_eval.strip()
             if cleaned.startswith("```"):
                 cleaned = "\n".join([l for l in cleaned.split("\n") if not l.startswith("```")])
             parsed = json.loads(cleaned)
         except Exception:
-            parsed = {"marks": 10, "confidence": 0.8, "feedback": raw_eval}
+            parsed = {"total_marks": 10, "max_total_marks": 10, "overall_confidence": 0.8, "confidence_level": "medium", "feedback": raw_eval}
 
         parsed["ocr_text"] = ocr_text
+        if student_reg:
+            parsed["reg_no"] = student_reg
         parsed["processing_time_ms"] = int((time.perf_counter() - start_t) * 1000)
         parsed["model_used"] = "glm-ocr + llama3.2:3b (Colab GPU)"
         return JSONResponse(parsed)
