@@ -490,11 +490,13 @@ OUTPUT ONLY VALID JSON in this exact format:
 async def grade(
     file: UploadFile = File(...),
     rubric: str = Form(default="Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity."),
+    question_paper_file: Optional[UploadFile] = File(default=None),
+    question_paper: Optional[str] = Form(default=""),
     structured_rubric: Optional[str] = Form(default=None),
     return_ocr: bool = Form(default=True),
     return_question_breakdown: bool = Form(default=True),
-    burst: bool = False,
-    warm: bool = False,
+    burst: bool = Form(default=True),
+    warm: bool = Form(default=False),
 ):
     """Grade a student answer sheet image."""
     job_id = uuid.uuid4().hex[:12]
@@ -547,6 +549,18 @@ async def grade(
 
     # -- 4. Run inference with fallback --
     try:
+        # Read Question Paper bytes if uploaded
+        qp_bytes = None
+        if question_paper_file:
+            try:
+                qp_bytes = await question_paper_file.read()
+                if qp_bytes:
+                    qp_ext = Path(question_paper_file.filename or "qp.jpg").suffix.lower()
+                    qp_saved = UPLOAD_DIR / f"{job_id}_qp{qp_ext}"
+                    qp_saved.write_bytes(qp_bytes)
+            except Exception as e:
+                logger.warning(f"[{job_id}] Could not save question paper: {e}")
+
         result = await _grade_with_fallback(
             image_b64=image_b64,
             rubric=rubric,
@@ -554,6 +568,8 @@ async def grade(
             return_question_breakdown=return_question_breakdown,
             burst=burst,
             warm=warm,
+            question_paper=question_paper or "",
+            qp_file_bytes=qp_bytes,
         )
         fallback_used = result.get("fallback_used", False)
     except Exception as e:
@@ -579,8 +595,10 @@ async def grade(
     # Build final result
     _total = float(result.get("total_marks", 0) or 0)
     _max = float(result.get("max_total_marks", 10) or 10)
-    # Compute percentage server-side -- never trust the LLM's arithmetic
-    _pct = round(100.0 * _total / _max, 1) if _max > 0 else 0.0
+    if _total > _max:
+        _max = max(20.0, _total) if _total <= 20 else max(100.0, _total)
+    # Compute percentage server-side -- safely clamped 0.0 to 100.0
+    _pct = min(100.0, max(0.0, round(100.0 * _total / _max, 1))) if _max > 0 else 0.0
     result_data = {
         "job_id": job_id,
         "total_marks": _total,
@@ -611,10 +629,14 @@ async def grade(
     # Extract student identity and physical ink document blocks
     raw_ocr = result.get("ocr_text", "")
     ident = extract_student_identity(raw_ocr)
-    if ident.get("reg_no"):
-        result_data["reg_no"] = ident["reg_no"]
-    if ident.get("student_name"):
-        result_data["student_name"] = ident["student_name"]
+    detected_reg = ident.get("reg_no") or result.get("reg_no")
+    if detected_reg:
+        safe_reg = "".join(c for c in str(detected_reg) if c.isalnum() or c in ("-", "_")).strip()
+        if safe_reg:
+            result_data["reg_no"] = safe_reg
+    if ident.get("student_name") or result.get("student_name"):
+        result_data["student_name"] = ident.get("student_name") or result.get("student_name")
+    
     result_data["blocks"] = extract_document_blocks(
         raw_ocr,
         result_data.get("question_grades", []),
@@ -632,7 +654,21 @@ async def grade(
     result_path = RESULT_DIR / f"{job_id}_grade.json"
     result_dict = final_result.model_dump()
     result_path.write_text(json.dumps(result_dict, indent=2, default=str), encoding="utf-8")
-    logger.info(f"[{job_id}] Saved grade to {result_path} (processed in {processing_time_ms}ms)")
+
+    # If Registration Number detected, create indexed copy renamed to Reg No
+    if result_data.get("reg_no"):
+        safe_reg = result_data["reg_no"]
+        reg_img_path = UPLOAD_DIR / f"{safe_reg}{saved_path.suffix}"
+        reg_res_path = RESULT_DIR / f"{safe_reg}_grade.json"
+        try:
+            import shutil
+            shutil.copy2(saved_path, reg_img_path)
+            reg_res_path.write_text(json.dumps(result_dict, indent=2, default=str), encoding="utf-8")
+            logger.info(f"[{job_id}] Student Reg No indexed: renamed/linked to {safe_reg}")
+        except Exception as e:
+            logger.warning(f"[{job_id}] Failed to link to reg no: {e}")
+
+    logger.info(f"[{job_id}] Saved grade to {result_path} (processed in {processing_time_ms}ms) (processed in {processing_time_ms}ms)")
 
     # Broadcast completion
     _broadcast_progress(job_id, {
@@ -1232,7 +1268,7 @@ async def _normalize_colab_result(result: dict) -> dict:
         conf = 0.5
     return {
         "total_marks": result.get("marks", 0),
-        "max_total_marks": result.get("max_total_marks", 10),
+        "max_total_marks": result.get("max_total_marks", 20 if float(result.get("marks", 0) or 0) > 10 else 10),
         "overall_confidence": conf,
         "confidence_level": (
             "high" if conf >= 0.75 else "low" if conf < 0.4 else "medium"
@@ -1246,19 +1282,24 @@ async def _normalize_colab_result(result: dict) -> dict:
     }
 
 
-async def _colab_grade_endpoint(image_b64: str, rubric: str) -> dict:
+async def _colab_grade_endpoint(
+    image_b64: str,
+    rubric: str,
+    question_paper: str = "",
+    qp_file_bytes: Optional[bytes] = None
+) -> dict:
     """Call Colab /grade endpoint for full OCR + grading pipeline."""
     if not COLAB_INFERENCE_URL:
         raise RuntimeError("COLAB_INFERENCE_URL not configured")
     
     import httpx
-    
-    # Decode base64 image
     image_bytes = base64.b64decode(image_b64)
     
     async with httpx.AsyncClient(timeout=600) as client:
         files = {"file": ("image.jpg", image_bytes, "image/jpeg")}
-        data = {"rubric": rubric}
+        if qp_file_bytes:
+            files["question_paper_file"] = ("qp.jpg", qp_file_bytes, "image/jpeg")
+        data = {"rubric": rubric, "question_paper": question_paper}
         
         resp = await client.post(
             f"{COLAB_INFERENCE_URL}/grade",
@@ -1275,42 +1316,41 @@ async def _grade_with_fallback(
     rubric: str,
     job_id: str,
     return_question_breakdown: bool = True,
-    burst: bool = False,
+    burst: bool = True,
     warm: bool = False,
+    question_paper: str = "",
+    qp_file_bytes: Optional[bytes] = None,
 ) -> dict:
     """
-    Try local Ollama first, fallback to Colab on failure.
-    With burst=True, Colab is tried FIRST when its health probe passes;
-    otherwise degrade to local with a `burst_unavailable` flag (never a 500).
-    With warm=True, the burst session is prime-verified and the backend is
-    asked to unload models after the paper (zero-resident discipline).
-    Returns parsed result dict with structured grading output.
+    Try Colab GPU burst first when configured and healthy (sub-4s turnaround);
+    otherwise degrade gracefully to local Ollama.
     """
-    # Burst opt-in: Colab primary when healthy (skip slow local OCR)
-    if burst:
+    # Auto-enable burst if Colab is configured and circuit is intact
+    should_burst = burst or bool(COLAB_INFERENCE_URL and _breaker_allows())
+    if should_burst:
         if _breaker_allows() and await _colab_healthy():
-            logger.info(f"[{job_id}] Burst mode: Colab healthy, using burst primary...")
-            _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Burst OCR (Colab)..."})
+            logger.info(f"[{job_id}] Cloud Burst active: Colab GPU healthy, routing primary...")
+            _broadcast_progress(job_id, {"stage": "ocr", "progress": 20, "message": "Ultra-fast GPU OCR (Colab)..."})
             try:
                 if warm:
-                    await _colab_healthy()  # prime = second confirmation
-                result = await _colab_grade_endpoint(image_b64, rubric)
+                    await _colab_healthy()
+                result = await _colab_grade_endpoint(image_b64, rubric, question_paper=question_paper, qp_file_bytes=qp_file_bytes)
                 _breaker_success()
-                logger.info(f"[{job_id}] Burst primary succeeded")
+                logger.info(f"[{job_id}] Cloud Burst primary succeeded")
                 out = await _normalize_colab_result(result)
                 flags = out.setdefault("flags", [])
                 if warm and "warmed" not in flags:
                     flags.append("warmed")
                 await _colab_unload_models()
                 return out
-            except Exception:
+            except Exception as e:
                 _breaker_failure()
-                logger.warning(f"[{job_id}] Burst primary failed, degrading to local")
+                logger.warning(f"[{job_id}] Cloud Burst primary failed ({e}), falling back to local...")
         elif _colab_breaker["state"] == "OPEN":
-            logger.info(f"[{job_id}] Burst requested but circuit OPEN — instant local path")
+            logger.info(f"[{job_id}] Burst requested but circuit OPEN -- instant local path")
         else:
-            logger.info(f"[{job_id}] Burst requested but Colab unreachable — local path")
-    burst_degraded = burst
+            logger.info(f"[{job_id}] Burst requested but Colab unreachable -- local path")
+    burst_degraded = should_burst
 
     # Try local first (blocking Ollama calls run in a worker thread so the
     # event loop stays free for /health, /results and concurrent grades)

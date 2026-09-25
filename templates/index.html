@@ -965,11 +965,20 @@
 
           <div class="field" style="margin-bottom:12px;background:#fbfbfa;border:1px solid #e5e3df;border-radius:8px;padding:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <label for="qpInput" style="font-weight:700;color:#0a1530;margin:0;">📄 Master Question Paper (Optional)</label>
+              <label for="qpText" style="font-weight:700;color:#0a1530;margin:0;">📄 Master Question Paper (Optional)</label>
               <span class="badge badge-purple" style="font-size:10px;padding:1px 6px;">Auto-extracts Qs & Marks</span>
             </div>
-            <p class="helper" style="margin-bottom:8px;">Upload Question Paper image or paste text. Inscrona maps student answers to exact questions & section parts.</p>
-            <textarea class="rubric" id="qpText" style="min-height:55px;height:55px;margin-bottom:6px;" placeholder="Paste Question Paper or Marking Scheme text here (e.g. Part A: Q1 (2m), Q2 (2m)... Part B: Q6 (10m)...)"></textarea>
+            <p class="helper" style="margin-bottom:8px;">Upload Question Paper file (image/PDF) or paste scheme text. Inscrona maps student answers to exact questions & section parts.</p>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <input type="file" id="qpFileInput" accept="image/*,.heic,.heif,.pdf" style="display:none">
+              <button type="button" class="btn-ghost" id="qpUploadBtn" style="min-height:36px;padding:5px 12px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;">
+                <svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Upload Question Paper
+              </button>
+              <span id="qpFileName" class="mono" style="font-size:12px;color:var(--ink-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">No file chosen</span>
+              <button type="button" class="icon-btn" id="qpClearBtn" style="display:none;min-height:30px;padding:2px 8px;font-size:11.5px;">✕</button>
+            </div>
+            <textarea class="rubric" id="qpText" style="min-height:55px;height:55px;margin-bottom:0;" placeholder="Or paste Question Paper / Marking Scheme text here (e.g. Part A: Q1 (2m), Q2 (2m)... Part B: Q6 (10m)...)"></textarea>
           </div>
 
           <div class="field">
@@ -986,7 +995,7 @@
           <div class="check-row">
             <label class="check"><input type="checkbox" id="optOcr" checked> Include OCR transcript</label>
             <label class="check"><input type="checkbox" id="optBreakdown" checked> Per-question breakdown</label>
-            <label class="check"><input type="checkbox" id="optBurst"> Colab burst</label>
+            <label class="check"><input type="checkbox" id="optBurst" checked> 🚀 Colab GPU Burst (~3s)</label>
           </div>
           <p class="helper" id="burstHint" hidden>Burst sends this paper to the Colab T4 tunnel when reachable, otherwise grades locally — typically under a minute on burst.</p>
           <p class="helper" id="paceNote" aria-live="polite"></p>
@@ -1551,6 +1560,32 @@
     if (f) setFile(f);
   });
   $('removeFile').addEventListener('click', clearFile);
+
+  /* ── Question Paper Upload handler ── */
+  let currentQpFile = null;
+  const qpFi = $('qpFileInput');
+  const qpBtn = $('qpUploadBtn');
+  const qpName = $('qpFileName');
+  const qpClear = $('qpClearBtn');
+  if (qpBtn && qpFi) {
+    qpBtn.addEventListener('click', () => qpFi.click());
+    qpFi.addEventListener('change', () => {
+      const f = qpFi.files && qpFi.files[0];
+      if (f) {
+        currentQpFile = f;
+        qpName.textContent = f.name + ' (' + Math.round(f.size/1024) + ' KB)';
+        qpClear.style.display = 'inline-flex';
+        say('Question paper file selected: ' + f.name);
+      }
+    });
+    qpClear.addEventListener('click', () => {
+      currentQpFile = null;
+      qpFi.value = '';
+      qpName.textContent = 'No file chosen';
+      qpClear.style.display = 'none';
+      say('Question paper file removed.');
+    });
+  }
   $('optBurst').addEventListener('change', () => {
     $('burstHint').hidden = !$('optBurst').checked;
     say($('optBurst').checked ? 'Colab burst enabled for the next grade.' : 'Colab burst disabled.');
@@ -1617,6 +1652,7 @@
     fd.append('file', currentFile);
     const qpVal = $('qpText') ? $('qpText').value.trim() : '';
     if (qpVal) fd.append('question_paper', qpVal);
+    if (currentQpFile) fd.append('question_paper_file', currentQpFile);
     fd.append('rubric', $('rubric').value);
     fd.append('return_ocr', $('optOcr').checked ? 'true' : 'false');
     fd.append('return_question_breakdown', $('optBreakdown').checked ? 'true' : 'false');
