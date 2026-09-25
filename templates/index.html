@@ -469,6 +469,380 @@
     .batch-file-list.show { display: block; }
     .batch-file-item { display: flex; justify-content: space-between; padding: 3px 0; }
 
+  
+    /* ═══════════════════════════════════════════════════════════════════
+       NOTION DESIGN SYSTEM & DATALAB PLAYGROUND WORKSTATION
+       notion.design.md compliance:
+       - Primary: #5645d4, Navy: #0a1530
+       - Rectangular 8px buttons, 12px cards, 1px #e5e3df hairlines
+       - Pastel card tints: lavender, sky, mint, peach, rose, bold yellow
+       ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      --color-primary: #5645d4;
+      --color-primary-pressed: #4534b3;
+      --color-brand-navy: #0a1530;
+      --color-hairline: #e5e3df;
+      --color-hairline-strong: #c8c4be;
+      --color-canvas: #ffffff;
+      --color-surface: #f6f5f4;
+      --color-surface-soft: #fafaf9;
+      --color-ink: #1a1a1a;
+      --color-charcoal: #37352f;
+      --color-steel: #787671;
+      --tint-peach: #ffe8d4;
+      --tint-rose: #fde0ec;
+      --tint-mint: #d9f3e1;
+      --tint-lavender: #e6e0f5;
+      --tint-sky: #dcecfa;
+      --tint-yellow-bold: #f9e79f;
+      --rounded-md: 8px;
+      --rounded-lg: 12px;
+    }
+
+    /* Notion Sober Rectangular Buttons */
+    .btn-notion-primary {
+      background: var(--color-primary); color: #ffffff;
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+      border-radius: 8px; padding: 10px 18px; border: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.15s ease;
+    }
+    .btn-notion-primary:hover { background: var(--color-primary-pressed); }
+    .btn-notion-sec {
+      background: transparent; color: var(--color-ink);
+      font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 500;
+      border-radius: 8px; padding: 7px 14px; border: 1px solid var(--color-hairline-strong);
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-notion-sec:hover { background: var(--color-surface); border-color: var(--color-steel); }
+
+    /* Workstation Mode Expansion */
+    .playground.workstation-expanded {
+      display: block !important;
+      max-width: 1720px !important;
+    }
+    .playground.workstation-expanded #paneQueue,
+    .playground.workstation-expanded #paneWorkspace {
+      display: none !important;
+    }
+    .playground.workstation-expanded #paneInspector {
+      display: block !important;
+      width: 100% !important;
+      min-height: 85vh !important;
+    }
+    .playground.workstation-expanded .datalab-workstation {
+      min-height: 78vh !important;
+    }
+    .q-card.highlighted {
+      border-color: var(--color-primary) !important;
+      background: var(--tint-lavender) !important;
+      box-shadow: 0 0 0 2px var(--color-primary);
+    }
+
+    /* Datalab Split-Screen Workstation */
+    .datalab-workstation {
+      display: grid;
+      grid-template-columns: 1fr;
+      min-height: 640px;
+      background: #ffffff;
+      border-top: 1px solid var(--color-hairline);
+    }
+    .playground.workstation-expanded .datalab-workstation {
+      grid-template-columns: minmax(440px, 1fr) minmax(480px, 1.15fr) !important;
+    }
+    @media (min-width: 1380px) {
+      #paneInspector:not(.stacked) .datalab-workstation {
+        grid-template-columns: minmax(320px, 0.9fr) minmax(380px, 1.1fr);
+      }
+    }
+
+    /* Left Canvas */
+    .datalab-canvas-panel {
+      background: #f5f4f2;
+      border-right: 1px solid var(--color-hairline);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .canvas-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--color-hairline);
+      gap: 10px;
+      z-index: 10;
+    }
+    .canvas-tool-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .canvas-btn {
+      background: var(--color-surface);
+      border: 1px solid var(--color-hairline-strong);
+      color: var(--color-charcoal);
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .canvas-btn:hover {
+      background: #ffffff;
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .toggle-boxes-label {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--color-charcoal);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .canvas-viewport {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      background: radial-gradient(circle, #e5e3df 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .canvas-stage {
+      position: relative;
+      display: inline-block;
+      transform-origin: top center;
+      transition: transform 0.12s ease-out;
+      box-shadow: 0 6px 24px rgba(10, 21, 48, 0.12);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    #datalabDocImg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      user-select: none;
+    }
+    .canvas-box-layer {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
+    .canvas-box-layer.hidden {
+      display: none !important;
+    }
+
+    /* Bounding Boxes with Notion Pastel Tints */
+    .bbox-item {
+      position: absolute;
+      pointer-events: auto;
+      cursor: pointer;
+      border-radius: 4px;
+      box-sizing: border-box;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      padding: 2px 4px;
+    }
+    .bbox-PAGEHEADER {
+      background: rgba(230, 224, 245, 0.42);
+      border: 2px solid #7b3ff2;
+    }
+    .bbox-PAGEHEADER .bbox-tag {
+      background: var(--tint-lavender);
+      color: #391c57;
+    }
+    .bbox-QUESTION {
+      background: rgba(220, 236, 250, 0.42);
+      border: 2px solid #0075de;
+    }
+    .bbox-QUESTION .bbox-tag {
+      background: var(--tint-sky);
+      color: #005bab;
+    }
+    .bbox-HANDWRITING {
+      background: rgba(217, 243, 225, 0.42);
+      border: 2px solid #1aae39;
+    }
+    .bbox-HANDWRITING .bbox-tag {
+      background: var(--tint-mint);
+      color: #067647;
+    }
+    .bbox-DIAGRAM {
+      background: rgba(255, 232, 212, 0.42);
+      border: 2px solid #dd5b00;
+    }
+    .bbox-DIAGRAM .bbox-tag {
+      background: var(--tint-peach);
+      color: #793400;
+    }
+
+    .bbox-item:hover, .bbox-item.active {
+      border-color: #5645d4 !important;
+      border-width: 3px !important;
+      background: rgba(86, 69, 212, 0.28) !important;
+      box-shadow: 0 0 0 3px rgba(86, 69, 212, 0.35), 0 4px 14px rgba(10, 21, 48, 0.2);
+      z-index: 25;
+    }
+    .bbox-tag {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* Right Tabs Panel */
+    .datalab-tabs-panel {
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .datalab-tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--color-hairline);
+      background: var(--color-surface);
+      padding: 6px 12px 0;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .datalab-tab-item {
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--color-steel);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 10px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .datalab-tab-item:hover {
+      color: var(--color-ink);
+    }
+    .datalab-tab-item.active {
+      color: var(--color-ink);
+      border-bottom-color: var(--color-primary);
+      font-weight: 700;
+    }
+    .datalab-tab-view {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .datalab-tab-view.active {
+      display: block;
+    }
+
+    /* Blocks Stream (Datalab Style) */
+    .blocks-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .block-card {
+      background: #ffffff;
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .block-card:hover, .block-card.active {
+      border-color: var(--color-primary);
+      box-shadow: 0 2px 10px rgba(86, 69, 212, 0.16);
+      background: var(--color-surface-soft);
+    }
+    .block-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .block-tag-badge {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .block-coords {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--color-steel);
+    }
+    .block-text {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--color-charcoal);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Markdown & JSON Previews */
+    .markdown-preview-box, .json-preview-box {
+      background: #0b1220;
+      border-radius: 8px;
+      margin-top: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .markdown-preview-box pre, .json-preview-box pre {
+      margin: 0;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+    .mini-btn-notion {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      border: 1px solid var(--color-hairline-strong);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mini-btn-notion:hover {
+      background: #ffffff;
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
   </style>
 </head>
 <body>
@@ -689,70 +1063,129 @@
     <!-- ═══ RIGHT · INSPECTOR ═══ -->
     <section class="pane" id="paneInspector" data-tab aria-label="Grading result" role="tabpanel" aria-labelledby="tabBtnResult" tabindex="0">
       <div class="pane-head">
-        <h2>Result</h2>
+        <div style="display:flex;align-items:center;gap:9px;">
+          <h2>Result & Workstation</h2>
+          <span class="badge" style="background:var(--tint-lavender);color:#391c57;font-size:11px;padding:2px 8px;border-radius:9999px;font-weight:700;">Datalab Split-Canvas</span>
+        </div>
         <span class="spacer"></span>
-        <span class="mono" id="inspectorJob" style="font-size:12px;color:var(--muted);"></span>
+        <span class="mono" id="inspectorJob" style="font-size:12px;color:var(--muted);margin-right:8px;"></span>
+        <button class="btn-notion-sec" id="btnToggleWorkstation" type="button" title="Toggle full-width workstation view">
+          <svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          <span id="btnWorkstationText">Expand Canvas</span>
+        </button>
       </div>
       <div id="inspectorBody">
         <div class="inspector-empty" id="inspectorEmpty">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
           <strong>No paper selected</strong>
-          <p>Grade a new paper, or pick one from the Papers queue to inspect its marks.</p>
+          <p>Grade a new paper, or pick one from the Papers queue to inspect its marks and bounding boxes.</p>
         </div>
         <div id="inspectorResult" hidden>
-          <div class="insp-cols">
-            <div>
-              <div class="score-hero">
-                <div class="donut" role="img" id="donutImg" aria-label="Score donut chart">
-                  <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
-                    <circle cx="56" cy="56" r="46" fill="none" stroke="#eef0f4" stroke-width="11"/>
-                    <circle id="donutArc" cx="56" cy="56" r="46" fill="none" stroke="#5645d4"
-                      stroke-width="11" stroke-linecap="round" stroke-dasharray="0 289" />
-                  </svg>
-                  <div class="donut-center"><b id="donutPct">0%</b><span>score</span></div>
+          <div class="datalab-workstation" id="datalabWorkstation">
+            <!-- LEFT: Interactive Document Viewer Canvas -->
+            <div class="datalab-canvas-panel" id="datalabCanvasPanel">
+              <div class="canvas-toolbar">
+                <div class="canvas-tool-group">
+                  <button type="button" class="canvas-btn" id="btnZoomIn" title="Zoom In">＋</button>
+                  <button type="button" class="canvas-btn" id="btnZoomOut" title="Zoom Out">－</button>
+                  <button type="button" class="canvas-btn" id="btnZoomFit" title="Fit to Canvas">Fit</button>
+                  <button type="button" class="canvas-btn" id="btnZoomReset" title="Reset 100%">100%</button>
                 </div>
-                <div class="score-meta">
-                  <div class="score-total" id="scoreTotal">0 / 0</div>
-                  <div class="score-sub">total marks</div>
-                  <div class="badge-row" id="badgeRow"></div>
+                <div class="canvas-tool-group">
+                  <label class="toggle-boxes-label">
+                    <input type="checkbox" id="chkToggleBoxes" checked>
+                    <span>Bounding Boxes</span>
+                  </label>
+                </div>
+                <span class="canvas-status mono" id="canvasScaleText" style="font-size:12px;color:var(--color-steel);">100%</span>
+              </div>
+
+              <div class="canvas-viewport" id="canvasViewport">
+                <div class="canvas-stage" id="canvasStage">
+                  <img id="datalabDocImg" src="" alt="Student answer sheet" />
+                  <div class="canvas-box-layer" id="canvasBoxLayer"></div>
                 </div>
               </div>
-              <div class="flag-row" id="flagRow"></div>
-              <div class="section-label">Per-question marks</div>
-              <div class="q-list" id="qList"></div>
             </div>
-            <div>
-              <div class="section-label">Overall feedback</div>
-              <div class="feedback-box" id="feedbackBox"></div>
-              <div class="section-label">OCR transcript</div>
-              <details class="transcript" id="transcriptBox">
-                <summary>
-                  <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-                  <span id="transcriptTitle">Show transcript</span>
-                  <span class="spacer"></span>
-                  <span class="mono" id="transcriptLen" style="font-size:12px;color:var(--muted);"></span>
-                </summary>
-                <div class="transcript-body">
-                  <pre id="transcriptText" tabindex="0"></pre>
-                  <div class="transcript-actions">
-                    <button class="mini-btn" type="button" id="copyTranscript">
-                      <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
-                      Copy
-                    </button>
+
+            <!-- RIGHT: Datalab-Style Multi-Tab Inspector -->
+            <div class="datalab-tabs-panel" id="datalabTabsPanel">
+              <!-- Segmented Tab Navigation -->
+              <div class="datalab-tab-nav" role="tablist">
+                <button type="button" class="datalab-tab-item active" id="tabNavMarks" data-tab="marks">📝 Marks & Rubric</button>
+                <button type="button" class="datalab-tab-item" id="tabNavBlocks" data-tab="blocks">🧱 Blocks (<span id="blockCountBadge">0</span>)</button>
+                <button type="button" class="datalab-tab-item" id="tabNavMarkdown" data-tab="markdown">📄 Markdown</button>
+                <button type="button" class="datalab-tab-item" id="tabNavJson" data-tab="json">⚙️ JSON</button>
+              </div>
+
+              <!-- Tab View 1: Marks & Rubric -->
+              <div class="datalab-tab-view active" id="tabViewMarks">
+                <div class="score-hero">
+                  <div class="donut" role="img" id="donutImg" aria-label="Score donut chart">
+                    <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true">
+                      <circle cx="56" cy="56" r="46" fill="none" stroke="#eef0f4" stroke-width="11"/>
+                      <circle id="donutArc" cx="56" cy="56" r="46" fill="none" stroke="#5645d4"
+                        stroke-width="11" stroke-linecap="round" stroke-dasharray="0 289" />
+                    </svg>
+                    <div class="donut-center"><b id="donutPct">0%</b><span>score</span></div>
+                  </div>
+                  <div class="score-meta">
+                    <div class="score-total" id="scoreTotal">0 / 0</div>
+                    <div class="score-sub">total marks</div>
+                    <div class="badge-row" id="badgeRow"></div>
                   </div>
                 </div>
-              </details>
-              <div class="section-label">Run details</div>
+                <div class="flag-row" id="flagRow"></div>
+                <div class="section-label" style="padding-left:0;padding-right:0;">Per-question marks</div>
+                <div class="q-list" id="qList"></div>
+                <div class="section-label" style="padding-left:0;padding-right:0;">Overall feedback</div>
+                <div class="feedback-box" id="feedbackBox" style="margin:0;"></div>
+              </div>
+
+              <!-- Tab View 2: Blocks (Datalab Stream) -->
+              <div class="datalab-tab-view" id="tabViewBlocks">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span class="section-label" style="padding:0;">Extracted Document Blocks</span>
+                  <span class="mono" style="font-size:12px;color:var(--muted);">Hover or click to view box</span>
+                </div>
+                <div class="blocks-stream" id="blocksStream"></div>
+              </div>
+
+              <!-- Tab View 3: Academic Markdown -->
+              <div class="datalab-tab-view" id="tabViewMarkdown">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span class="section-label" style="padding:0;">Formatted Academic Markdown</span>
+                  <button class="mini-btn-notion" type="button" id="copyMarkdownBtn">
+                    <svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+                    Copy Markdown
+                  </button>
+                </div>
+                <div class="markdown-preview-box">
+                  <pre id="markdownPre" tabindex="0"></pre>
+                </div>
+              </div>
+
+              <!-- Tab View 4: Raw JSON -->
+              <div class="datalab-tab-view" id="tabViewJson">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span class="section-label" style="padding:0;">Raw Schema Payload</span>
+                  <button class="mini-btn-notion" type="button" id="copyJsonBtn">
+                    <svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+                    Copy JSON
+                  </button>
+                </div>
+                <div class="json-preview-box">
+                  <pre id="rawJson" tabindex="0"></pre>
+                </div>
+              </div>
+
+              <!-- Run Details Footer -->
               <dl class="meta-grid">
                 <div class="meta-cell"><dt>Model</dt><dd class="mono" id="metaModel">—</dd></div>
                 <div class="meta-cell"><dt>Grading time</dt><dd class="mono" id="metaTime">—</dd></div>
                 <div class="meta-cell"><dt>Job ID</dt><dd class="mono" id="metaJob">—</dd></div>
-                <div class="meta-cell"><dt>Graded at</dt><dd id="metaDate">—</dd></div>
+                <div class="meta-cell"><dt>Hardware Accelerator</dt><dd class="mono" id="metaHw">—</dd></div>
               </dl>
-              <details class="rawjson">
-                <summary>View raw JSON</summary>
-                <pre id="rawJson" tabindex="0"></pre>
-              </details>
             </div>
           </div>
         </div>
@@ -934,7 +1367,7 @@
       const crits = q.criterion_scores && typeof q.criterion_scores === 'object'
         ? Object.entries(q.criterion_scores).map(([k, v]) =>
             '<span class="crit">' + esc(k) + ' ' + esc(v) + '</span>').join('') : '';
-      return '<article class="q-card"><div class="q-top">' +
+      return '<article class="q-card" data-qid="' + esc(q.question_id || '') + '"><div class="q-top">' +
         '<span class="q-id">' + esc(q.question_id || 'Q?') + '</span>' +
         '<span class="q-text">' + esc(q.question_text || '') + '</span>' +
         '<span class="q-marks">' + qm + ' / ' + qx + '</span></div>' +
@@ -945,29 +1378,11 @@
     }).join('') : '<p class="helper" style="padding:4px 0;">No per-question breakdown for this paper.</p>';
 
     $('feedbackBox').textContent = d.feedback || 'No overall feedback recorded.';
-    const ocr = d.ocr_text || '';
-    $('transcriptTitle').textContent = ocr.trim() ? 'Show transcript' : 'Transcript unavailable';
-    $('transcriptLen').textContent = ocr ? ocr.length + ' chars' : '';
-    $('transcriptText').textContent = ocr || 'No OCR text was saved for this paper.';
-    $('transcriptBox').open = false;
     $('metaModel').textContent = d.model_used || '—';
     $('metaTime').textContent = fmtDur(d.processing_time_ms);
     $('metaJob').textContent = d.job_id || '—';
-    $('metaDate').textContent = fmtDate(d.timestamp || (d.created_at ? Date.parse(d.created_at) / 1000 : null));
-    $('rawJson').textContent = JSON.stringify(d, null, 2);
+    if ($('rawJson')) $('rawJson').textContent = JSON.stringify(d, null, 2);
   }
-  $('copyTranscript').addEventListener('click', async (e) => {
-    const btn = e.currentTarget, txt = $('transcriptText').textContent;
-    try { await navigator.clipboard.writeText(txt); }
-    catch {
-      const ta = document.createElement('textarea');
-      ta.value = txt; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); ta.remove();
-    }
-    const old = btn.innerHTML;
-    btn.innerHTML = CHECK_SVG + 'Copied';
-    setTimeout(() => { btn.innerHTML = old; }, 1600);
-  });
 
   /* ── workspace: file handling ─────────────────────────────── */
   const dz = $('dropzone'), fi = $('fileInput');
@@ -1330,7 +1745,8 @@
   }
 
   /* Re-grade Batch with New Rubric */
-  $('regradeBatchBtn').addEventListener('click', async () => {
+  const rgb = $('regradeBatchBtn');
+  if (rgb) rgb.addEventListener('click', async () => {
     const newRubric = prompt('Enter updated rubric or marking criteria to re-score:', $('rubric').value);
     if (!newRubric || !activeBatchId) {
       if (!activeBatchId) alert('No active batch ID found. Select a batch first.');
@@ -1372,6 +1788,281 @@
   /* ── queue controls ── */
   $('refreshQueue').addEventListener('click', () => { loadQueue(); say('Refreshing papers.'); });
   $('queueSearch').addEventListener('input', (e) => renderQueue(e.target.value.trim().toLowerCase()));
+
+  
+  /* ═══════════════════════════════════════════════════════════════════
+     DATALAB SPLIT-SCREEN WORKSTATION INTERACTIVE CONTROLLER
+     ═══════════════════════════════════════════════════════════════════ */
+  let currentDocScale = 1.0;
+  let activeBboxId = null;
+  let currentResultData = null;
+
+  // 1. Zoom and Pan Controls
+  const stage = $('canvasStage');
+  const docImg = $('datalabDocImg');
+  const boxLayer = $('canvasBoxLayer');
+  const scaleText = $('canvasScaleText');
+
+  function setDocScale(s) {
+    currentDocScale = Math.max(0.2, Math.min(3.0, s));
+    stage.style.transform = `scale(${currentDocScale})`;
+    scaleText.textContent = Math.round(currentDocScale * 100) + '%';
+  }
+
+  $('btnZoomIn').addEventListener('click', () => setDocScale(currentDocScale + 0.15));
+  $('btnZoomOut').addEventListener('click', () => setDocScale(currentDocScale - 0.15));
+  $('btnZoomReset').addEventListener('click', () => setDocScale(1.0));
+  $('btnZoomFit').addEventListener('click', () => {
+    const vp = $('canvasViewport');
+    if (docImg.naturalWidth && vp.clientWidth) {
+      const fit = (vp.clientWidth - 48) / docImg.naturalWidth;
+      setDocScale(fit);
+    }
+  });
+
+  // Toggle bounding boxes visibility
+  $('chkToggleBoxes').addEventListener('change', (e) => {
+    boxLayer.classList.toggle('hidden', !e.target.checked);
+  });
+
+  // Toggle full-width workstation mode
+  let isWorkstationExpanded = false;
+  $('btnToggleWorkstation').addEventListener('click', () => {
+    isWorkstationExpanded = !isWorkstationExpanded;
+    document.querySelector('.playground').classList.toggle('workstation-expanded', isWorkstationExpanded);
+    $('btnWorkstationText').textContent = isWorkstationExpanded ? 'Standard View' : 'Expand Canvas';
+    say(isWorkstationExpanded ? 'Workstation canvas expanded.' : 'Standard layout restored.');
+    // Trigger re-fit
+    setTimeout(() => {
+      const vp = $('canvasViewport');
+      if (docImg.naturalWidth && vp.clientWidth) {
+        const fit = Math.min(1.0, (vp.clientWidth - 48) / docImg.naturalWidth);
+        setDocScale(fit);
+      }
+    }, 150);
+  });
+
+  // 2. Datalab Tabs Switching
+  const datalabTabs = document.querySelectorAll('.datalab-tab-item');
+  datalabTabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+      datalabTabs.forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.datalab-tab-view').forEach((v) => {
+        v.classList.toggle('active', v.id === `tabView${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+      });
+    });
+  });
+
+  // 3. Highlight synchronization
+  function highlightBlock(blockId) {
+    activeBboxId = blockId;
+    document.querySelectorAll('.bbox-item').forEach((b) => {
+      b.classList.toggle('active', b.dataset.blockId === blockId);
+    });
+    document.querySelectorAll('.block-card').forEach((c) => {
+      c.classList.toggle('active', c.dataset.blockId === blockId);
+      if (c.dataset.blockId === blockId) {
+        c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+    document.querySelectorAll('.q-card').forEach((q) => {
+      const qid = q.dataset.qid;
+      if (qid && blockId && blockId.toUpperCase().includes(qid.toUpperCase())) {
+        q.classList.add('highlighted');
+      } else {
+        q.classList.remove('highlighted');
+      }
+    });
+  }
+
+  // 4. Render Bounding Boxes on Canvas and Blocks Stream
+  function renderDocumentBlocks(blocks, jobId) {
+    boxLayer.innerHTML = '';
+    const stream = $('blocksStream');
+    stream.innerHTML = '';
+    $('blockCountBadge').textContent = blocks.length;
+
+    if (!blocks || !blocks.length) {
+      stream.innerHTML = '<p class="helper">No bounding blocks extracted for this paper.</p>';
+      return;
+    }
+
+    blocks.forEach((b, idx) => {
+      const bid = b.id || `block_${idx}`;
+      const [ymin, xmin, ymax, xmax] = b.box_2d || [0, 0, 1000, 1000];
+      const top = (ymin / 10).toFixed(2) + '%';
+      const left = (xmin / 10).toFixed(2) + '%';
+      const height = Math.max(2, ((ymax - ymin) / 10)).toFixed(2) + '%';
+      const width = Math.max(5, ((xmax - xmin) / 10)).toFixed(2) + '%';
+      const type = (b.type || 'HANDWRITING').toUpperCase();
+
+      // Canvas Box Element
+      const box = document.createElement('div');
+      box.className = `bbox-item bbox-${type}`;
+      box.dataset.blockId = bid;
+      box.style.top = top;
+      box.style.left = left;
+      box.style.height = height;
+      box.style.width = width;
+
+      const tagBadge = document.createElement('span');
+      tagBadge.className = 'bbox-tag';
+      tagBadge.textContent = b.question_id ? `${b.tag || type} ${b.question_id}` : (b.tag || type);
+      box.appendChild(tagBadge);
+
+      box.addEventListener('mouseenter', () => highlightBlock(bid));
+      box.addEventListener('click', () => {
+        highlightBlock(bid);
+        const navBlocks = $('tabNavBlocks');
+        if (navBlocks) navBlocks.click();
+      });
+      boxLayer.appendChild(box);
+
+      // Stream Block Card
+      const card = document.createElement('div');
+      card.className = 'block-card';
+      card.dataset.blockId = bid;
+      card.dataset.qid = b.question_id || '';
+
+      let tintBg = 'var(--tint-lavender)', tintColor = '#391c57';
+      if (type === 'QUESTION') { tintBg = 'var(--tint-sky)'; tintColor = '#005bab'; }
+      else if (type === 'HANDWRITING') { tintBg = 'var(--tint-mint)'; tintColor = '#067647'; }
+      else if (type === 'DIAGRAM') { tintBg = 'var(--tint-peach)'; tintColor = '#793400'; }
+
+      card.innerHTML = `
+        <div class="block-top">
+          <span class="block-tag-badge" style="background:${tintBg};color:${tintColor};">${esc(b.tag || type)} ${esc(b.question_id || '')}</span>
+          <span class="block-coords">[${ymin}, ${xmin}, ${ymax}, ${xmax}] · ${Math.round((b.confidence || 0.85)*100)}%</span>
+        </div>
+        <div class="block-text">${esc(b.text || '')}</div>
+        ${b.marks !== undefined && b.marks !== null ? `<div style="margin-top:6px;font-weight:700;font-size:12.5px;color:var(--color-primary);">Awarded: ${b.marks} / ${b.max_marks} marks ${b.feedback ? `— <span style="font-weight:400;color:var(--color-charcoal);">${esc(b.feedback)}</span>` : ''}</div>` : ''}
+      `;
+
+      card.addEventListener('mouseenter', () => highlightBlock(bid));
+      card.addEventListener('click', () => highlightBlock(bid));
+      stream.appendChild(card);
+    });
+  }
+
+  // 5. Generate Academic Markdown representation
+  function generateAcademicMarkdown(d) {
+    const total = d.total_marks ?? d.marks ?? 0;
+    const max = d.max_total_marks ?? 10;
+    const pct = d.percentage ?? (max > 0 ? Math.round(100 * total / max) : 0);
+    const qs = Array.isArray(d.question_grades) ? d.question_grades : [];
+
+    let md = `# Exam Grading Report — #${d.job_id || 'sample'}\n\n`;
+    md += `**Overall Score:** ${total} / ${max} marks (${pct}%)  \n`;
+    md += `**Letter Grade:** ${d.letter_grade || (pct >= 80 ? 'A' : pct >= 60 ? 'B' : pct >= 40 ? 'C' : 'F')} | **Confidence:** ${Math.round((d.overall_confidence ?? 0.85)*100)}% (${d.confidence_level || 'high'})  \n`;
+    md += `**Model:** ${d.model_used || 'Hybrid OCR + LLM'} | **Processing Time:** ${fmtDur(d.processing_time_ms)}  \n\n`;
+    md += `## Overall Feedback\n${d.feedback || 'Answer paper evaluated successfully.'}\n\n`;
+
+    if (qs.length) {
+      md += `## Per-Question Assessment\n\n`;
+      qs.forEach((q) => {
+        md += `### ${q.question_id || 'Question'} (${q.marks_awarded ?? 0} / ${q.max_marks ?? 0} marks)\n`;
+        if (q.question_text) md += `*${q.question_text}*\n\n`;
+        if (q.feedback) md += `> **Feedback:** ${q.feedback}\n\n`;
+      });
+    }
+
+    if (d.ocr_text) {
+      md += `## Optical Character Recognition Transcript\n\`\`\`text\n${d.ocr_text}\n\`\`\`\n`;
+    }
+    return md;
+  }
+
+  // Copy Markdown & Copy JSON handlers
+  $('copyMarkdownBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget, txt = $('markdownPre').textContent;
+    try { await navigator.clipboard.writeText(txt); }
+    catch {
+      const ta = document.createElement('textarea');
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    const old = btn.innerHTML;
+    btn.innerHTML = CHECK_SVG + 'Copied Markdown';
+    setTimeout(() => { btn.innerHTML = old; }, 1600);
+  });
+
+  $('copyJsonBtn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget, txt = $('rawJson').textContent;
+    try { await navigator.clipboard.writeText(txt); }
+    catch {
+      const ta = document.createElement('textarea');
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    const old = btn.innerHTML;
+    btn.innerHTML = CHECK_SVG + 'Copied JSON';
+    setTimeout(() => { btn.innerHTML = old; }, 1600);
+  });
+
+  // 6. Hook into renderResult to populate Workstation
+  const origRenderResult = renderResult;
+  renderResult = function(d) {
+    currentResultData = d;
+    origRenderResult(d);
+
+    // Set Image Source
+    const jid = d.job_id;
+    if (previewUrl && currentFile) {
+      docImg.src = previewUrl;
+    } else if (jid) {
+      docImg.src = `/results/${encodeURIComponent(jid)}/image`;
+    }
+
+    docImg.onload = () => {
+      // Re-fit canvas smoothly
+      const vp = $('canvasViewport');
+      if (docImg.naturalWidth && vp.clientWidth) {
+        const fit = Math.min(1.0, (vp.clientWidth - 48) / docImg.naturalWidth);
+        setDocScale(fit);
+      }
+    };
+
+    // Render Blocks
+    const blocks = d.blocks || [];
+    renderDocumentBlocks(blocks, jid);
+
+    // Markdown
+    $('markdownPre').textContent = generateAcademicMarkdown(d);
+
+    // Hardware
+    fetch('/hardware').then(r => r.json()).then(hw => {
+      if (hw && hw.hardware) {
+        $('metaHw').textContent = hw.hardware.gpu_name || hw.hardware.description;
+      }
+    }).catch(() => {});
+  };
+
+  // 7. Poll and show detected hardware badge
+  async function updateHardwareBadge() {
+    try {
+      const res = await fetch('/hardware');
+      if (!res.ok) return;
+      const data = await res.json();
+      const hw = data.hardware;
+      const badge = $('hwBadge');
+      const text = $('hwBadgeText');
+      if (hw.gpu_type === 'apple_metal') {
+        text.textContent = '⚡ Apple Metal (Zero-Copy VRAM)';
+        badge.style.background = 'rgba(86, 69, 212, 0.2)';
+        badge.style.color = '#d6b6f6';
+      } else if (hw.gpu_type === 'nvidia_cuda') {
+        text.textContent = '⚡ Nvidia CUDA Active';
+        badge.style.background = 'rgba(26, 174, 57, 0.2)';
+        badge.style.color = '#a6e9c5';
+      } else {
+        text.textContent = '☁️ Cloud API Fast Tier (1.5s)';
+        badge.style.background = 'rgba(255, 255, 255, 0.1)';
+        badge.style.color = '#d5dbe7';
+      }
+    } catch (e) {}
+  }
+  updateHardwareBadge();
 
   /* ── boot ── */
   pollStatus(); loadQueue(); switchTab('paneWorkspace');
