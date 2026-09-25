@@ -1,5 +1,35 @@
 # Progress
 
+## Wave 4: Datalab Split-Screen Document Workstation & Universal Hardware Detection
+**Status: DONE** (2026-09-25)
+
+### Key Achievements:
+1. **Datalab Split-Screen Document Workstation**:
+   - Left Canvas: High-res interactive document viewer with zoom controls (`+`, `-`, `Fit`, `100%`), pan, and color-coded bounding boxes.
+   - Bounding Boxes: Accurately identifies `PageHeader`, `Question`, `Handwriting`, and `Diagram` coordinates (`0-1000` scale) rendered with Notion pastel tints (`#e6e0f5` lavender, `#dcecfa` sky, `#d9f3e1` mint, `#ffe8d4` peach).
+   - Right Multi-Tab Inspector: Datalab tab suite (`[ 📝 Marks & Rubric | 🧱 Blocks | 📄 Markdown | ⚙️ JSON ]`).
+   - Bidirectional Highlighting: Hovering or clicking any bounding box on the scanned student exam paper highlights the corresponding rubric score & feedback in real-time, and vice versa!
+   - Fullscreen Canvas Expansion: `[ ⤢ Expand Canvas ]` expands the workstation to a widescreen dual-pane view for deep exam evaluation.
+
+2. **Universal Hardware Auto-Detection (`hardware.py`)**:
+   - Native macOS Apple Silicon Metal acceleration detection (`apple_metal` with zero-copy unified memory).
+   - Windows / Linux Nvidia CUDA acceleration detection (`nvidia_cuda`).
+   - Host CPU graceful fallback (`cpu`) with recommendation of Mistral / Gemini fast cloud API tier for sub-2s latency.
+   - Live hardware status badge in the topbar (`/hardware`).
+
+3. **Strict `notion.design.md` Compliance**:
+   - Rectangular 8px buttons (`border-radius: 8px`), sober editorial geometry (no pill buttons for actions).
+   - 12px card corners, 1px `#e5e3df` hairlines, Notion Sans / Inter typography.
+   - Brand navy `#0a1530` topbar and signature purple `#5645d4` dominant CTAs.
+   - 9 Notion database pastel card tints for block categorization.
+
+4. **Test Suite Verification**:
+   - 30 passed unit and integration tests (`pytest tests/`).
+   - Zero console errors in Chrome DevTools.
+   - Live validation on real student answer sheets (`b98325367610.jpg`).
+
+---
+
 ## Task 1: Confirm glm-ocr runs via Ollama on a real image
 **Status: DONE**
 

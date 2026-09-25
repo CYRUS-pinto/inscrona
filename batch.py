@@ -17,39 +17,42 @@ class StagedBatchManager:
     def __init__(self, db_path: str = "database.db"):
         self.db_path = db_path
 
+    def _ensure_db(self, conn: sqlite3.Connection):
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS batches (
+                batch_id TEXT PRIMARY KEY,
+                rubric TEXT,
+                engine TEXT,
+                status TEXT,
+                current_phase INTEGER DEFAULT 0,
+                total_papers INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS batch_papers (
+                job_id TEXT PRIMARY KEY,
+                batch_id TEXT,
+                filename TEXT,
+                file_path TEXT,
+                ocr_text TEXT,
+                marks REAL,
+                max_marks REAL,
+                percentage REAL,
+                confidence REAL,
+                confidence_level TEXT,
+                feedback TEXT,
+                status TEXT,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(batch_id) REFERENCES batches(batch_id)
+            )
+        """)
+
     async def init_db(self):
         def _init():
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS batches (
-                        batch_id TEXT PRIMARY KEY,
-                        rubric TEXT,
-                        engine TEXT,
-                        status TEXT,
-                        current_phase INTEGER DEFAULT 0,
-                        total_papers INTEGER DEFAULT 0,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS batch_papers (
-                        job_id TEXT PRIMARY KEY,
-                        batch_id TEXT,
-                        filename TEXT,
-                        file_path TEXT,
-                        ocr_text TEXT,
-                        marks REAL,
-                        max_marks REAL,
-                        percentage REAL,
-                        confidence REAL,
-                        confidence_level TEXT,
-                        feedback TEXT,
-                        status TEXT,
-                        error_message TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY(batch_id) REFERENCES batches(batch_id)
-                    )
-                """)
+                self._ensure_db(conn)
                 conn.commit()
         await asyncio.to_thread(_init)
 
@@ -65,6 +68,7 @@ class StagedBatchManager:
 
         def _insert():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 conn.execute(
                     "INSERT INTO batches (batch_id, rubric, engine, status, current_phase, total_papers) VALUES (?, ?, ?, ?, ?, ?)",
                     (bid, rubric, engine, "queued", 0, total)
@@ -84,6 +88,7 @@ class StagedBatchManager:
     async def update_paper_ocr(self, job_id: str, ocr_text: str, error: Optional[str] = None):
         def _update():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 if error:
                     conn.execute(
                         "UPDATE batch_papers SET ocr_text = ?, status = 'failed', error_message = ? WHERE job_id = ?",
@@ -111,6 +116,7 @@ class StagedBatchManager:
 
         def _update():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 if error:
                     conn.execute(
                         """UPDATE batch_papers 
@@ -131,6 +137,7 @@ class StagedBatchManager:
     async def set_batch_phase(self, batch_id: str, phase: int, status: str):
         def _update():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 conn.execute(
                     "UPDATE batches SET current_phase = ?, status = ? WHERE batch_id = ?",
                     (phase, status, batch_id)
@@ -144,6 +151,7 @@ class StagedBatchManager:
         """
         def _reset():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 conn.execute(
                     "UPDATE batches SET rubric = ?, current_phase = 2, status = 'phase2_grading' WHERE batch_id = ?",
                     (new_rubric, batch_id)
@@ -158,6 +166,7 @@ class StagedBatchManager:
     async def get_status(self, batch_id: str) -> Dict[str, Any]:
         def _get():
             with sqlite3.connect(self.db_path) as conn:
+                self._ensure_db(conn)
                 conn.row_factory = sqlite3.Row
                 row = conn.execute("SELECT * FROM batches WHERE batch_id = ?", (batch_id,)).fetchone()
                 if not row:

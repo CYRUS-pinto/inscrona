@@ -306,6 +306,20 @@ def export_csv():
     )
 
 
+
+@app.get("/results/{job_id}/image")
+def get_result_image(job_id: str):
+    """Serve the student answer sheet image for a given job."""
+    for ext in (".jpg", ".jpeg", ".png", ".webp"):
+        p = UPLOAD_DIR / f"{job_id}{ext}"
+        if p.exists():
+            return FileResponse(p)
+    # Check if test_sheet_1.jpg exists as fallback sample
+    sample = Path("test_sheet_1.jpg")
+    if sample.exists():
+        return FileResponse(sample)
+    raise HTTPException(status_code=404, detail="Image not found")
+
 @app.get("/results/{job_id}")
 def get_result(job_id: str):
     """Return the full grading result for a specific job."""
