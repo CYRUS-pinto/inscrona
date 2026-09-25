@@ -3,7 +3,7 @@ from cloud_api import parse_cloud_grading_response, is_cloud_api_available
 
 def test_cloud_response_parsing_clean_json():
     raw_json = '{"marks": 9, "confidence": 0.95, "feedback": "Excellent work with clear derivations", "ocr_text": "Q1: Photosynthesis..."}'
-    res = parse_cloud_grading_response(raw_json, model_name="gemini-2.0-flash")
+    res = parse_cloud_grading_response(raw_json, model_name="mistral/pixtral-12b-2409")
     assert res["total_marks"] == 9.0
     assert res["max_total_marks"] == 10.0
     assert res["percentage"] == 90.0
@@ -11,7 +11,7 @@ def test_cloud_response_parsing_clean_json():
     assert res["confidence_level"] == "high"
     assert res["feedback"] == "Excellent work with clear derivations"
     assert res["ocr_text"] == "Q1: Photosynthesis..."
-    assert res["model_used"] == "gemini-2.0-flash"
+    assert res["model_used"] == "mistral/pixtral-12b-2409"
 
 def test_cloud_response_parsing_markdown_wrapped_json():
     raw_json = """```json
@@ -29,9 +29,10 @@ def test_cloud_response_parsing_markdown_wrapped_json():
     assert "Partial credit" in res["feedback"]
 
 def test_cloud_api_availability(monkeypatch):
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     assert is_cloud_api_available() is False
 
-    monkeypatch.setenv("GEMINI_API_KEY", "test_key_123")
+    monkeypatch.setenv("MISTRAL_API_KEY", "mistral_test_key_xyz")
     assert is_cloud_api_available() is True

@@ -6,8 +6,12 @@ from typing import Dict, Any, Optional
 import httpx
 
 def is_cloud_api_available() -> bool:
-    """Returns True if any supported Cloud API key is configured."""
-    return bool(os.getenv("GEMINI_API_KEY") or os.getenv("OPENROUTER_API_KEY"))
+    """Returns True if any supported Cloud API key (Mistral, Gemini, OpenRouter) is configured."""
+    return bool(
+        os.getenv("MISTRAL_API_KEY") or
+        os.getenv("GEMINI_API_KEY") or
+        os.getenv("OPENROUTER_API_KEY")
+    )
 
 def parse_cloud_grading_response(raw: str, model_name: str = "cloud_flash_api") -> Dict[str, Any]:
     """
@@ -15,7 +19,6 @@ def parse_cloud_grading_response(raw: str, model_name: str = "cloud_flash_api") 
     Robustly handles code block markdown, leading/trailing prose, and percentage confidences.
     """
     cleaned = raw.strip()
-    # Strip markdown fences if present
     if "```" in cleaned:
         match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
         if match:
@@ -26,7 +29,6 @@ def parse_cloud_grading_response(raw: str, model_name: str = "cloud_flash_api") 
     try:
         data = json.loads(cleaned)
     except Exception:
-        # Fallback regex extraction if JSON has subtle syntax issues
         marks_m = re.search(r'"marks"\s*:\s*([0-9.]+)', cleaned)
         conf_m = re.search(r'"confidence"\s*:\s*([0-9.]+)', cleaned)
         feed_m = re.search(r'"feedback"\s*:\s*"([^"]+)"', cleaned)
@@ -69,30 +71,37 @@ async def cloud_grade(
 ) -> Dict[str, Any]:
     """
     Grades a single student answer sheet using a Cloud Vision-LLM API.
-    Costs ~$0.0001 per paper with 1.5 - 2.5 second turnaround time.
+    Supports Mistral AI (Pixtral 12B/Large), Google Gemini (2.0/1.5 Flash), and OpenRouter.
+    Fast turnaround (~1.5s - 2.5s) with high handwriting transcription accuracy.
     """
+    mistral_key = os.getenv("MISTRAL_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY")
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
-    if not gemini_key and not openrouter_key:
-        raise RuntimeError("Neither GEMINI_API_KEY nor OPENROUTER_API_KEY is configured in .env")
+    if not mistral_key and not gemini_key and not openrouter_key:
+        raise RuntimeError("No Cloud API key configured. Please set MISTRAL_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY in .env")
 
-    # Default to Gemini if key available, else OpenRouter
-    use_gemini = bool(gemini_key) if provider in (None, "gemini", "auto") else False
+    # Select provider based on preference and available keys
+    if provider == "mistral" or (provider in (None, "auto") and mistral_key):
+        selected_provider = "mistral"
+    elif provider == "gemini" or (provider in (None, "auto") and gemini_key):
+        selected_provider = "gemini"
+    else:
+        selected_provider = "openrouter"
 
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-    prompt = f"""You are an expert exam grader and transcription engine.
+    prompt = f"""You are an expert academic exam grader and transcription engine.
 Extract all handwritten text from this student exam answer sheet, and grade it according to the rubric.
 
 Rubric:
 {rubric}
 
 Instructions:
-1. Extract full handwriting into 'ocr_text'.
-2. Grade fairly out of 10 marks into 'marks'.
-3. Assign a 'confidence' between 0.0 and 1.0 based on legibility and certainty.
-4. Provide constructive teacher feedback in 'feedback'.
+1. Accurately transcribe all student handwriting, formulas, and diagrams into 'ocr_text'.
+2. Grade the student fairly out of 10 marks into 'marks'.
+3. Assign a 'confidence' between 0.0 and 1.0 based on handwriting clarity and certainty.
+4. Provide constructive, pedagogical feedback in 'feedback'.
 
 You MUST return ONLY a valid JSON object matching this schema:
 {{
@@ -102,7 +111,34 @@ You MUST return ONLY a valid JSON object matching this schema:
   "feedback": "<detailed constructive feedback>"
 }}"""
 
-    if use_gemini:
+    # 1. Mistral AI (Pixtral 12B / Pixtral Large)
+    if selected_provider == "mistral":
+        model = os.getenv("MISTRAL_MODEL", "pixtral-12b-2409")
+        url = "https://api.mistral.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {mistral_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64_image}"}
+                ]
+            }],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1
+        }
+        async with httpx.AsyncClient(timeout=40.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            raw_text = resp.json()["choices"][0]["message"]["content"]
+            return parse_cloud_grading_response(raw_text, model_name=f"mistral/{model}")
+
+    # 2. Google Gemini Flash (2.0 / 1.5)
+    elif selected_provider == "gemini":
         model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
         payload = {
@@ -122,9 +158,10 @@ You MUST return ONLY a valid JSON object matching this schema:
             resp.raise_for_status()
             data = resp.json()
             raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return parse_cloud_grading_response(raw_text, model_name=model)
+            return parse_cloud_grading_response(raw_text, model_name=f"google/{model}")
+
+    # 3. OpenRouter Universal Fallback
     else:
-        # OpenRouter fallback
         model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
@@ -147,4 +184,4 @@ You MUST return ONLY a valid JSON object matching this schema:
             resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
             raw_text = resp.json()["choices"][0]["message"]["content"]
-            return parse_cloud_grading_response(raw_text, model_name=model)
+            return parse_cloud_grading_response(raw_text, model_name=f"openrouter/{model}")

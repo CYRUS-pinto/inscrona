@@ -84,6 +84,7 @@ OCR_LONGEST_EDGE = 2000
 OCR_JPEG_QUALITY = 90
 OCR_PROMPT_TERSE = False
 GRADE_NUM_PREDICT = 2048
+LOCAL_GRADING_MODEL = os.getenv("LOCAL_GRADING_MODEL", "llama3.2:3b")
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 RESULT_DIR.mkdir(exist_ok=True)
@@ -538,7 +539,7 @@ async def _process_phase2_grading(batch_id: str, rubric: str):
         try:
             grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
             grade_raw = await asyncio.to_thread(
-                _ollama_generate, "llama3.2:3b", grade_prompt,
+                _ollama_generate, LOCAL_GRADING_MODEL, grade_prompt,
                 keep_alive=300, format_json=True, num_ctx=4096,
                 num_predict=GRADE_NUM_PREDICT
             )
@@ -564,7 +565,7 @@ async def _process_phase2_grading(batch_id: str, rubric: str):
             await batch_mgr.update_paper_grade(jid, 0, 10, 0.0, f"Grading error: {e}", error=str(e))
 
     try:
-        await asyncio.to_thread(_ollama_generate, "llama3.2:3b", "", keep_alive=0)
+        await asyncio.to_thread(_ollama_generate, LOCAL_GRADING_MODEL, "", keep_alive=0)
     except Exception:
         pass
     
@@ -948,6 +949,12 @@ def _ollama_generate(
     options: dict = {"num_predict": num_predict, "temperature": 0.1}
     if num_ctx is not None:
         options["num_ctx"] = num_ctx
+    num_gpu_env = os.getenv("OLLAMA_NUM_GPU")
+    if num_gpu_env is not None:
+        try:
+            options["num_gpu"] = int(num_gpu_env)
+        except ValueError:
+            pass
     payload: dict = {
         "model": model,
         "prompt": prompt,
@@ -1195,7 +1202,7 @@ async def _grade_with_fallback(
         _broadcast_progress(job_id, {"stage": "grading", "progress": 50, "message": "Local grading (Llama 3.2)..."})
         grade_prompt = GRADING_PROMPT_TEMPLATE.format(ocr_text=ocr_text, rubric=rubric)
         grade_raw = await asyncio.to_thread(
-            _ollama_generate, "llama3.2:3b", grade_prompt,
+            _ollama_generate, LOCAL_GRADING_MODEL, grade_prompt,
             keep_alive=0, format_json=True, num_ctx=4096,
             num_predict=GRADE_NUM_PREDICT,
         )
