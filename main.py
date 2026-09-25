@@ -1341,6 +1341,8 @@ async def _grade_with_fallback(
                 flags = out.setdefault("flags", [])
                 if warm and "warmed" not in flags:
                     flags.append("warmed")
+                out["fallback_used"] = False
+                out["model_used"] = "glm-ocr + llama3.2:3b (Colab T4 GPU)"
                 await _colab_unload_models()
                 return out
             except Exception as e:

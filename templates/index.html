@@ -1416,7 +1416,7 @@
     $('scoreTotal').textContent = total + ' / ' + max;
 
     $('badgeRow').innerHTML = confBadge(conf, d.confidence_level) +
-      (d.fallback_used ? '<span class="badge badge-blue">' + ICONS.info + 'Colab fallback</span>' : '');
+      ((d.model_used && d.model_used.includes('Colab')) ? '<span class="badge badge-purple" style="font-weight:700;">⚡ Cloud Burst (Tesla T4)</span>' : (d.fallback_used ? '<span class="badge badge-blue">' + ICONS.info + 'Colab fallback</span>' : ''));
     $('flagRow').innerHTML = flags.map((f) =>
       '<span class="flag-chip">' + ICONS.flag + esc(f) + '</span>').join('');
 
