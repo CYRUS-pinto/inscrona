@@ -31,6 +31,7 @@ from pydantic.types import PositiveInt
 from batch import StagedBatchManager
 from cloud_api import cloud_grade, is_cloud_api_available
 from blocks import extract_document_blocks
+from hardware import detect_hardware, get_recommended_settings
 
 
 def _load_dotenv(path: str = ".env") -> None:
@@ -216,6 +217,14 @@ batch_mgr = StagedBatchManager(db_path="database.db")
 
 
 
+
+@app.get("/hardware")
+def get_hardware_info():
+    return {
+        "hardware": detect_hardware(),
+        "recommended": get_recommended_settings()
+    }
+
 @app.get("/health")
 def health():
     return {
@@ -223,6 +232,7 @@ def health():
         "mode": _current_mode(),
         "colab_circuit_open": _colab_breaker["state"] == "OPEN",
         "cloud_api_available": is_cloud_api_available(),
+        "hardware": detect_hardware(),
     }
 
 
