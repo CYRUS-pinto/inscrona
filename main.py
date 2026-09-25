@@ -82,7 +82,7 @@ MAX_LONGEST_EDGE = 2000
 # OCR tuning knobs (Phase 1 Task 3 — measured, see PROGRESS.md sweep table).
 # Narrower edge / lower JPEG quality cut vision tokens (faster); the terse
 # prompt cuts prompt tokens. Adopt a combo only via the eval-delta gate.
-OCR_LONGEST_EDGE = 2000
+OCR_LONGEST_EDGE = 1400
 OCR_JPEG_QUALITY = 90
 OCR_PROMPT_TERSE = False
 GRADE_NUM_PREDICT = 2048
