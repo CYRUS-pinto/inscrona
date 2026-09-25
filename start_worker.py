@@ -32,10 +32,12 @@ def ensure_ollama_running():
     """Ensure Ollama is installed and running."""
     # 1. Check if Ollama binary exists; if not, install it automatically (works on Colab/Linux)
     if shutil.which("ollama") is None and not Path("/usr/local/bin/ollama").exists() and not Path("/usr/bin/ollama").exists():
-        log("Ollama binary not found on system. Installing Ollama automatically...")
+        log("Ollama binary not found on system. Installing dependencies (zstd) and Ollama...")
         try:
+            # Install zstd decompression tool required by Ollama tarball
+            subprocess.run("apt-get update -qq && apt-get install -y -qq zstd curl", shell=True)
             res = subprocess.run("curl -fsSL https://ollama.ai/install.sh | sh", shell=True, capture_output=True, text=True)
-            if res.returncode == 0:
+            if res.returncode == 0 or Path("/usr/local/bin/ollama").exists():
                 log("Ollama installed successfully!")
             else:
                 log(f"Ollama installer output: {res.stdout} {res.stderr}")
@@ -228,7 +230,7 @@ def start_tunnel(tunnel_type: str, port: int) -> str:
     # 2. Try Pinggy (via native SSH which requires zero installs)
     log("Setting up Pinggy tunnel via SSH...")
     try:
-        cmd = f"ssh -p 443 -R0:localhost:{port} -o StrictHostKeyChecking=no a.pinggy.io"
+        cmd = f"ssh -p 443 -R0:localhost:{port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes a.pinggy.io"
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         for _ in range(25):
             line = proc.stdout.readline()
