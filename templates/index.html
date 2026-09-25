@@ -433,6 +433,42 @@
       .spinner, .stage[data-state="active"] .stage-dot .ring { animation: none !important;
         border-top-color: rgba(255,255,255,0.35); }
     }
+
+    /* ── Batch mode & Review by Exception tokens ───────────────── */
+    .mode-segmented {
+      display: flex; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-s); padding: 3px; margin-bottom: 14px;
+    }
+    .seg-btn {
+      flex: 1; border: none; background: transparent; color: var(--muted);
+      font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 12px;
+      border-radius: 6px; cursor: pointer; transition: all 0.15s var(--ease);
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    }
+    .seg-btn.active {
+      background: var(--surface); color: var(--ink); font-weight: 700;
+      box-shadow: var(--shadow-1);
+    }
+    .queue-filters {
+      display: flex; gap: 6px; padding: 0 16px 10px; flex-wrap: wrap;
+    }
+    .filter-btn {
+      font: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 999px; padding: 4px 10px; cursor: pointer;
+      transition: all 0.15s var(--ease);
+    }
+    .filter-btn:hover { border-color: var(--brand); color: var(--brand-ink); }
+    .filter-btn.active { background: var(--brand-soft); color: var(--brand-ink); border-color: var(--brand); font-weight: 700; }
+    .filter-btn.warn.active { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
+    .batch-file-list {
+      display: none; margin-top: 10px; max-height: 120px; overflow-y: auto;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-s); padding: 8px 12px; font-size: 12.5px;
+    }
+    .batch-file-list.show { display: block; }
+    .batch-file-item { display: flex; justify-content: space-between; padding: 3px 0; }
+
   </style>
 </head>
 <body>
@@ -478,6 +514,11 @@
           Refresh
         </button>
       </div>
+            <div class="queue-filters" role="group" aria-label="Filter papers">
+        <button type="button" class="filter-btn active" id="filterAll">All Papers</button>
+        <button type="button" class="filter-btn warn" id="filterReview">⚠️ Needs Review (<70%)</button>
+        <button type="button" class="filter-btn" id="filterHigh">High Conf (≥70%)</button>
+      </div>
       <div class="search-wrap">
         <div class="search-box">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -495,6 +536,28 @@
       </div>
       <div class="pane-body">
         <form id="gradeForm" novalidate>
+        <div class="mode-segmented" role="tablist">
+          <button type="button" class="seg-btn active" id="segSingle" role="tab" aria-selected="true">
+            <svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Single Paper
+          </button>
+          <button type="button" class="seg-btn" id="segBatch" role="tab" aria-selected="false">
+            <svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            📁 Batch Grading (Class)
+          </button>
+        </div>
+
+        <div class="field" style="margin-top:0;margin-bottom:14px;">
+          <label for="engineSelect">Inference Engine</label>
+          <select id="engineSelect" style="width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-s);padding:9px 12px;font-weight:600;">
+            <option value="auto">Auto-Adaptive (Local <=6GB, Colab GPU burst if connected)</option>
+            <option value="cloud_flash">⚡ Cloud Flash API (Sub-2s, High Accuracy, ~$0.0001/paper)</option>
+            <option value="colab_burst">🚀 Colab T4 Burst (Free 16GB VRAM, Zero Local Load)</option>
+            <option value="staged_local">💻 Staged Local (Two-Phase Zero-Thrashing, 100% Offline)</option>
+          </select>
+          <p class="helper" id="engineHelper">Auto chooses the fastest available tier while avoiding memory thrashing.</p>
+        </div>
+
           <div class="dz-wrap">
             <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload answer sheet image. Activate to browse files, or drag and drop an image here.">
               <input type="file" id="fileInput" accept="image/*,.heic,.heif" aria-hidden="true" tabindex="-1">
@@ -503,6 +566,16 @@
               <span class="hint">JPG, PNG, WebP or HEIC · up to 20 MB · resized to 2000px automatically</span>
             </div>
           </div>
+          <div class="dz-wrap" id="batchDzWrap" style="display:none;">
+            <div class="dropzone" id="batchDropzone" role="button" tabindex="0" aria-label="Upload multiple student answer sheets. Activate to browse files, or drag and drop images here.">
+              <input type="file" id="batchFileInput" multiple accept="image/*,.heic,.heif" aria-hidden="true" tabindex="-1">
+              <svg class="big" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+              <strong>Drop student answer sheets here (Bulk Class)</strong>
+              <span class="hint">Select 10–80 papers · JPG, PNG, WebP or HEIC · Zero model thrashing</span>
+            </div>
+            <div class="batch-file-list" id="batchFileList"></div>
+          </div>
+
           <div class="preview-card" id="previewCard">
             <img id="previewImg" alt="Preview of the selected answer sheet">
             <div class="preview-meta">
@@ -545,6 +618,35 @@
 
           <div class="alert alert-error" id="errorBox" role="alert"></div>
         </form>
+        <div id="batchProgressCard" style="display:none;margin-top:16px;border:1px solid var(--border);border-radius:var(--radius-m);padding:16px;background:var(--surface);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <strong style="font-size:14px;color:var(--ink-2);" id="batchPhaseTitle">Batch Progress</strong>
+            <span class="mono" style="font-size:12px;color:var(--muted);" id="batchTimeElapsed">00:00</span>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;">
+              <span style="font-weight:600;color:var(--ink-3);">Phase 1: Transcribing Handwriting (GLM-OCR)</span>
+              <span class="mono" id="p1Count">0/0</span>
+            </div>
+            <div style="height:7px;background:var(--surface-2);border-radius:999px;overflow:hidden;">
+              <div id="p1Bar" style="height:100%;width:0%;background:#12b76a;transition:width 0.3s var(--ease);"></div>
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;">
+              <span style="font-weight:600;color:var(--ink-3);">Phase 2: Evaluating Against Rubric (Llama 3.2:3B)</span>
+              <span class="mono" id="p2Count">0/0</span>
+            </div>
+            <div style="height:7px;background:var(--surface-2);border-radius:999px;overflow:hidden;">
+              <div id="p2Bar" style="height:100%;width:0%;background:var(--brand);transition:width 0.3s var(--ease);"></div>
+            </div>
+          </div>
+          <div id="batchSummaryStats" style="display:flex;gap:10px;font-size:12.5px;flex-wrap:wrap;">
+            <span class="badge badge-green" id="batchDoneCount">0 Graded</span>
+            <span class="badge badge-amber" id="batchReviewCount">0 Needs Review (<70%)</span>
+          </div>
+        </div>
+
 
         <div class="stages" id="stages" aria-label="Grading progress">
           <div class="upload-bar" id="uploadBar"><i id="uploadFill"></i></div>
@@ -740,8 +842,13 @@
   }
   function renderQueue(filter) {
     const list = $('queueList');
-    const items = queueCache.filter((r) =>
+    let items = queueCache.filter((r) =>
       !filter || (r.job_id || '').toLowerCase().includes(filter));
+    if (currentFilter === 'review') {
+      items = items.filter((r) => confOf(r) < 0.70);
+    } else if (currentFilter === 'high') {
+      items = items.filter((r) => confOf(r) >= 0.70);
+    }
     $('queueCount').textContent = String(queueCache.length);
     if (!items.length) {
       list.innerHTML = queueCache.length
@@ -1066,7 +1173,186 @@
     $('runIcon').style.display = '';
     $('runLabel').textContent = currentFile ? 'Grade this paper' : 'Select an image to grade';
   }
-  $('gradeForm').addEventListener('submit', (e) => { e.preventDefault(); runGrade(); });
+
+  /* ── Batch mode & Review by Exception logic ───────────────── */
+  let activeMode = 'single'; // 'single' | 'batch'
+  let batchFiles = [];
+  let currentFilter = 'all'; // 'all' | 'review' | 'high'
+  let activeBatchId = null;
+  let batchPollTimer = null;
+
+  const segSingle = $('segSingle');
+  const segBatch = $('segBatch');
+  const batchDzWrap = $('batchDzWrap');
+  const singleDzWrap = dz.parentElement;
+  const batchFi = $('batchFileInput');
+  const batchFileList = $('batchFileList');
+
+  function setMode(mode) {
+    activeMode = mode;
+    if (mode === 'single') {
+      segSingle.classList.add('active'); segSingle.setAttribute('aria-selected', 'true');
+      segBatch.classList.remove('active'); segBatch.setAttribute('aria-selected', 'false');
+      singleDzWrap.style.display = 'block';
+      batchDzWrap.style.display = 'none';
+      if (currentFile) { $('runBtn').disabled = false; $('runLabel').textContent = 'Grade this paper'; }
+      else { $('runBtn').disabled = true; $('runLabel').textContent = 'Select an image to grade'; }
+    } else {
+      segBatch.classList.add('active'); segBatch.setAttribute('aria-selected', 'true');
+      segSingle.classList.remove('active'); segSingle.setAttribute('aria-selected', 'false');
+      singleDzWrap.style.display = 'none';
+      batchDzWrap.style.display = 'block';
+      if (batchFiles.length) { $('runBtn').disabled = false; $('runLabel').textContent = 'Start Staged Batch (' + batchFiles.length + ' papers)'; }
+      else { $('runBtn').disabled = true; $('runLabel').textContent = 'Select papers for batch'; }
+    }
+  }
+
+  segSingle.addEventListener('click', () => setMode('single'));
+  segBatch.addEventListener('click', () => setMode('batch'));
+
+  const bdz = $('batchDropzone');
+  bdz.addEventListener('click', () => batchFi.click());
+  bdz.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); batchFi.click(); }
+  });
+  batchFi.addEventListener('change', () => handleBatchFiles(batchFi.files));
+  ['dragenter', 'dragover'].forEach((ev) => bdz.addEventListener(ev, (e) => {
+    e.preventDefault(); bdz.classList.add('dragging');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => bdz.addEventListener(ev, (e) => {
+    e.preventDefault(); bdz.classList.remove('dragging');
+  }));
+  bdz.addEventListener('drop', (e) => {
+    const fs = e.dataTransfer && e.dataTransfer.files;
+    if (fs && fs.length) handleBatchFiles(fs);
+  });
+
+  function handleBatchFiles(fileList) {
+    batchFiles = Array.from(fileList).filter((f) => {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      return f.type.startsWith('image/') || ACCEPT_EXT.includes(ext);
+    });
+    if (!batchFiles.length) {
+      showError('No supported images found in selection.');
+      return;
+    }
+    batchFileList.innerHTML = '<strong style="display:block;margin-bottom:6px;">' + batchFiles.length + ' papers ready for batch:</strong>' +
+      batchFiles.slice(0, 10).map((f) => '<div class="batch-file-item mono"><span>' + esc(f.name) + '</span><span>' + (f.size / 1024).toFixed(0) + ' KB</span></div>').join('') +
+      (batchFiles.length > 10 ? '<div style="color:var(--muted);font-size:11.5px;margin-top:4px;">… and ' + (batchFiles.length - 10) + ' more papers</div>' : '');
+    batchFileList.classList.add('show');
+    $('runBtn').disabled = false;
+    $('runLabel').textContent = 'Start Staged Batch (' + batchFiles.length + ' papers)';
+    say(batchFiles.length + ' papers queued for batch grading.');
+  }
+
+  /* Filter papers queue: All | Review | High */
+  const fAll = $('filterAll'), fRev = $('filterReview'), fHigh = $('filterHigh');
+  function setQueueFilter(f) {
+    currentFilter = f;
+    [fAll, fRev, fHigh].forEach((b) => b.classList.remove('active'));
+    if (f === 'all') fAll.classList.add('active');
+    else if (f === 'review') fRev.classList.add('active');
+    else if (f === 'high') fHigh.classList.add('active');
+    renderQueue($('queueSearch').value.trim().toLowerCase());
+  }
+  fAll.addEventListener('click', () => setQueueFilter('all'));
+  fRev.addEventListener('click', () => setQueueFilter('review'));
+  fHigh.addEventListener('click', () => setQueueFilter('high'));
+
+  /* Batch Execution & Polling */
+  async function runBatchGrade() {
+    if (!batchFiles.length) return;
+    hideError();
+    $('batchProgressCard').style.display = 'block';
+    $('stages').classList.remove('show');
+    const btn = $('runBtn');
+    btn.disabled = true;
+    $('runSpinner').hidden = false;
+    $('runIcon').style.display = 'none';
+    $('runLabel').textContent = 'Processing Batch…';
+
+    const t0 = performance.now();
+    $('batchTimeElapsed').textContent = '00:00';
+    clearInterval(tickTimer);
+    tickTimer = setInterval(() => { $('batchTimeElapsed').textContent = mmss(performance.now() - t0); }, 250);
+
+    const fd = new FormData();
+    batchFiles.forEach((f) => fd.append('files', f));
+    fd.append('rubric', $('rubric').value || 'Rate the answer on a scale of 0-10 for content accuracy, completeness, and clarity.');
+    fd.append('engine', $('engineSelect').value);
+
+    try {
+      const resp = await fetch('/grade/batch', { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      activeBatchId = data.batch_id;
+      pollBatch(activeBatchId);
+      say('Batch started with ' + batchFiles.length + ' papers.');
+    } catch (err) {
+      clearInterval(tickTimer);
+      finishRun();
+      showError('Batch creation failed: ' + err.message, true);
+    }
+  }
+
+  async function pollBatch(bid) {
+    clearInterval(batchPollTimer);
+    batchPollTimer = setInterval(async () => {
+      try {
+        const r = await fetch('/grade/batch/' + encodeURIComponent(bid));
+        if (!r.ok) return;
+        const b = await r.json();
+        const total = b.total_papers || 1;
+        const p1Pct = Math.round(100 * (b.ocr_completed || 0) / total);
+        const p2Pct = Math.round(100 * (b.grading_completed || 0) / total);
+
+        $('p1Count').textContent = (b.ocr_completed || 0) + '/' + total;
+        $('p1Bar').style.width = p1Pct + '%';
+        $('p2Count').textContent = (b.grading_completed || 0) + '/' + total;
+        $('p2Bar').style.width = p2Pct + '%';
+        $('batchDoneCount').textContent = (b.grading_completed || 0) + ' Graded';
+        $('batchReviewCount').textContent = (b.review_needed_count || 0) + ' Needs Review (<70%)';
+
+        if (b.status === 'phase1_ocr') {
+          $('batchPhaseTitle').textContent = 'Phase 1: Transcribing Handwriting (' + p1Pct + '%)';
+        } else if (b.status === 'phase2_grading') {
+          $('batchPhaseTitle').textContent = 'Phase 2: Evaluating Against Rubric (' + p2Pct + '%)';
+        } else if (b.status === 'completed') {
+          clearInterval(batchPollTimer);
+          clearInterval(tickTimer);
+          $('batchPhaseTitle').textContent = 'Batch Completed Successfully! 🎉';
+          finishRun();
+          loadQueue();
+          say('Batch grading completed for ' + total + ' papers.');
+        }
+      } catch (e) {}
+    }, 2000);
+  }
+
+  /* Re-grade Batch with New Rubric */
+  $('regradeBatchBtn').addEventListener('click', async () => {
+    const newRubric = prompt('Enter updated rubric or marking criteria to re-score:', $('rubric').value);
+    if (!newRubric || !activeBatchId) {
+      if (!activeBatchId) alert('No active batch ID found. Select a batch first.');
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('rubric', newRubric);
+      const r = await fetch('/grade/batch/' + encodeURIComponent(activeBatchId) + '/regrade', {
+        method: 'POST',
+        body: fd
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      say('Re-grading batch against new rubric...');
+      $('batchProgressCard').style.display = 'block';
+      pollBatch(activeBatchId);
+    } catch (err) {
+      alert('Re-grade failed: ' + err.message);
+    }
+  });
+
+  $('gradeForm').addEventListener('submit', (e) => { e.preventDefault(); if (activeMode === 'batch') runBatchGrade(); else runGrade(); });
 
   /* ── mobile tabs ── */
   const mq = window.matchMedia('(max-width: 900px)');
