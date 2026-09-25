@@ -18,6 +18,7 @@ import re
 import shutil
 from pathlib import Path
 from PIL import Image
+from typing import Optional, List, Dict, Any, Union
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 REQUIRED_MODELS = ["glm-ocr", "llama3.2:3b"]
