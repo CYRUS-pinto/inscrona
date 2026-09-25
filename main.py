@@ -30,6 +30,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.types import PositiveInt
 from batch import StagedBatchManager
 from cloud_api import cloud_grade, is_cloud_api_available
+from blocks import extract_document_blocks
 
 
 def _load_dotenv(path: str = ".env") -> None:
@@ -177,6 +178,7 @@ class GradeResult(BaseModel):
     feedback: str = Field(default="", max_length=2000)
     question_grades: List[QuestionGrade] = Field(default_factory=list)
     ocr_text: str = Field(default="", max_length=50000)
+    blocks: List[Dict[str, Any]] = Field(default_factory=list)
     processing_time_ms: int = Field(default=0, ge=0)
     model_used: str = Field(default="", max_length=50)
     fallback_used: bool = Field(default=False)
@@ -303,6 +305,11 @@ def get_result(job_id: str):
     data = json.loads(result_path.read_text(encoding="utf-8"))
     data["job_id"] = job_id
     data["timestamp"] = result_path.stat().st_mtime
+    if "blocks" not in data or not data["blocks"]:
+        data["blocks"] = extract_document_blocks(
+            data.get("ocr_text", ""),
+            data.get("question_grades", [])
+        )
     return data
 
 
