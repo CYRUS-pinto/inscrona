@@ -839,3 +839,19 @@ No crash (pre-fix run OOM-500d on the same image). Timing 255s -> 161s
 - LIVE: `GET /health` →
   `{"status":"ok","mode":"local-only","colab_circuit_open":false}`.
   Headless render: MODE badge + burst toggle visible, 25 papers.
+
+## Wave 2 Task 5 DONE (Autonomous Colab T4 GPU Burst Pipeline & Live Verification)
+- **Autonomous CLI Setup**: Fixed Windows POSIX issues in `colab-cli` (`termios`/`tty`/`SIGWINCH`), upgraded to `google-colab-cli 0.7.2`, and harnessed authenticated `/colab/tty` WebSocket terminal to provision remote Colab T4 GPU container.
+- **Remote Provisioning**: Installed `zstd`, `ollama`, pulled `glm-ocr` (0.9B) and `llama3.2:3b` (2.0GB), launched FastAPI inference daemon and free Cloudflare tunnel.
+- **Active Tunnel**: `https://displaying-headed-selection-methodology.trycloudflare.com` (verified `/health` returns `{"status":"ok","models":{"ocr":{"name":"glm-ocr","loaded":true},"grading":{"name":"llama3.2:3b","loaded":true}},"backend":"colab","gpu":"T4"}`).
+- **Local Mode**: Configured `COLAB_INFERENCE_URL` in `.env`. Server reports `{"status":"ok","mode":"hybrid","colab_circuit_open":false}`.
+- **Live Burst Grading Verified**:
+  - Request: `POST http://localhost:8000/grade?burst=true` with `test_sheet_1.jpg`.
+  - Processing time: **30,751ms (~30.8s)** on T4 GPU vs 166s local CPU (5.4x speedup).
+  - Job ID: `5f5220150c44`, score: `8.0/10.0` (80.0%), confidence: `0.80` (high).
+  - Feedback: targeted binary trees and recursion evaluation.
+- **UI Verified (DevTools & Viewport Screenshot)**:
+  - Topbar: `MODE · hybrid` pill badge, `Server live` indicator.
+  - Left panel: 26 papers loaded, donut ring `80%` on newly graded paper `#5f522015`.
+  - Right panel: Donut score gauge, Colab fallback badge, rubric chips, and full OCR transcript accordion.
+- **Test Suite**: 18 passed, 0 failed (`uv run pytest tests`).
